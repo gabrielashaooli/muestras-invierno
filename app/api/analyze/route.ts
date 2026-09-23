@@ -44,12 +44,13 @@ Otros campos:
 - "desc": descripción corta en español de la prenda (ej. "Suéter de punto trenzado cuello redondo").
 - "marca", "talla", "estilo", "codigo": tal como aparecen en la etiqueta. "codigo" es el UPC/EAN completo.
 - "tela": composición tal cual (ej. "60% algodón, 40% poliéster"), de la etiqueta o de una fuente confirmada.
-- "color": el color principal en español según la etiqueta o, si no hay, el que se ve claramente en la foto.
-- "dept": uno de Damas, Caballeros, Infantiles, Bebés, o "" si no es claro.
+- "color": en español, según la etiqueta o lo que se ve claramente en la foto. Si la prenda tiene varios colores,
+  ponlos todos separados por coma (ej. "Negro, Blanco").
+- "dept": uno de Caballero, Mujer, Infantiles (bebés cuenta como Infantiles), o "" si no es claro.
 - "keyItemId": id numérico del key item de la lista que corresponda claramente, o null.
 - "confianza": "alta", "media" o "baja".
 - "fotoPrenda": número de la foto (desde 0) que mejor muestra la prenda completa (no una etiqueta), o null si todas son etiquetas.
-- "notas": en español, breve: qué se confirmó en internet, discrepancias y qué quedó sin llenar.
+- "notas": en español, una sola frase corta y útil (ej. "Precio de lista en línea: $49.99"). Si no hay nada relevante, "".
 
 Tu respuesta final debe ser SOLO un objeto JSON, sin texto adicional ni bloques de código, con exactamente estas llaves:
 {"desc":"","marca":"","precio":"","talla":"","color":"","tela":"","estilo":"","codigo":"","dept":"","keyItemId":null,"notas":"","confianza":"","fotoPrenda":null}`;

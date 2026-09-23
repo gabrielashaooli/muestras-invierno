@@ -1,6 +1,6 @@
 // Tipos y constantes compartidos entre el cliente y el servidor.
 
-export const DEPARTAMENTOS = ["Damas", "Caballeros", "Infantiles", "Bebés"] as const;
+export const DEPARTAMENTOS = ["Caballero", "Mujer", "Infantiles"] as const;
 export type Departamento = (typeof DEPARTAMENTOS)[number];
 
 export const ESTATUS = ["solo_foto", "comprado"] as const;

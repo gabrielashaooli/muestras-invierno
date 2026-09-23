@@ -5,7 +5,7 @@ import { urlFotoValida } from "@/lib/blob";
 import { parsePrecio } from "@/lib/precio";
 import { esDepartamento, type Fuente } from "@/lib/tipos";
 
-// GET /api/samples?dept=Damas — lista de muestras (más recientes primero).
+// GET /api/samples?dept=Mujer — lista de muestras (más recientes primero).
 export async function GET(req: NextRequest) {
   const sql = await db();
   const dept = req.nextUrl.searchParams.get("dept");

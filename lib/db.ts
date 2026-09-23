@@ -53,6 +53,11 @@ async function crearTablas() {
       datos BYTEA NOT NULL,
       creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
     )`;
+  // Departamentos renombrados: Damas → Mujer, Caballeros → Caballero, Bebés → Infantiles.
+  await sql`UPDATE samples SET dept = CASE dept WHEN 'Damas' THEN 'Mujer' WHEN 'Caballeros' THEN 'Caballero' ELSE 'Infantiles' END
+            WHERE dept IN ('Damas', 'Caballeros', 'Bebés')`;
+  await sql`UPDATE key_items SET dept = CASE dept WHEN 'Damas' THEN 'Mujer' WHEN 'Caballeros' THEN 'Caballero' ELSE 'Infantiles' END
+            WHERE dept IN ('Damas', 'Caballeros', 'Bebés')`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

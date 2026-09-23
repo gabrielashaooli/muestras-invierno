@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function KeyItems({ keyItems, conSesion, alCambiar }: Props) {
-  const [dept, setDept] = useState<Departamento>("Damas");
+  const [dept, setDept] = useState<Departamento>("Mujer");
   const [texto, setTexto] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");

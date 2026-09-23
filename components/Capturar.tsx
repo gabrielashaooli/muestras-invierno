@@ -76,7 +76,7 @@ interface Props {
 }
 
 export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
-  const [dept, setDept] = useState<Departamento>("Damas");
+  const [dept, setDept] = useState<Departamento>("Mujer");
   const [status, setStatus] = useState<Estatus>("solo_foto");
   const [campos, setCampos] = useState<Campos>(VACIO);
   const [fotos, setFotos] = useState<Foto[]>([]); // etiquetas: se analizan con Claude
@@ -194,7 +194,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         n.key_item_id = String(r.keyItemId);
         llenados.push("key_item_id");
       }
-      const notaIA = [r.notas, r.confianza && `Confianza: ${r.confianza}`].filter(Boolean).join(" · ");
+      const notaIA = r.notas.trim();
       if (notaIA && !n.notas.trim()) {
         n.notas = notaIA;
         llenados.push("notas");
@@ -207,11 +207,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         for (const f of r.fuentes) mapa.set(f.url, f);
         return [...mapa.values()];
       });
-      if (esDepartamento(r.dept) && r.dept !== dept) setSugerenciaDept(r.dept);
-      setMensaje({
-        tipo: "ok",
-        texto: `Confianza ${r.confianza || "sin dato"}. Lo azul lo llenó Claude; lo punteado no lo supo, llénalo tú.`,
-      });
+
     } catch (e) {
       setMensaje({ tipo: "error", texto: `No se pudo analizar: ${(e as Error).message}` });
     } finally {
@@ -221,7 +217,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
 
   // Etiquetas: se suben y Claude llena el formulario.
   async function alElegirFotos(e: React.ChangeEvent<HTMLInputElement>) {
-    setProcesando("Comprimiendo fotos…");
+    setProcesando("Analizando…");
     try {
       const nuevas = await prepararFotos(e);
       setProcesando("");
@@ -263,7 +259,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
 
   async function guardar() {
     if (precioInvalido) {
-      setMensaje({ tipo: "error", texto: "Revisa el precio: escribe solo el número, ej. 29.99" });
+      setMensaje({ tipo: "error", texto: "El precio debe ser solo el número, por ejemplo 29.99" });
       return;
     }
     const fallidas = fotos.filter((f) => f.error).length;
@@ -303,57 +299,47 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   const precio = parsePrecio(campos.precio_usd);
   const precioInvalido = campos.precio_usd.trim() !== "" && precio === null;
 
-  // Clase y marca visual de cada campo: azul si lo llenó Claude, punteado si quedó por llenar.
-  function estadoCampo(id: keyof Campos) {
-    if (llenosIA.has(id)) return { clase: " lleno-ia", marca: <span className="marca-campo ia">IA</span> };
-    if (analizado && !campos[id].trim())
-      return { clase: " por-llenar", marca: <span className="marca-campo pendiente">Por llenar</span> };
-    return { clase: "", marca: null };
-  }
+  // Lo que llenó Claude se ve con fondo azul claro; nada más.
+  const claseCampo = (id: keyof Campos) => (llenosIA.has(id) ? "campo lleno-ia" : "campo");
 
   // Campo de texto reutilizable.
-  const campo = (id: CampoTexto, etiqueta: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => {
-    const e = estadoCampo(id);
-    return (
-      <div className={`campo${e.clase}`}>
-        <label htmlFor={id}>{etiqueta} {e.marca}</label>
-        <input id={id} value={campos[id]} onChange={(ev) => cambiar(id, ev.target.value)} {...extra} />
-      </div>
-    );
-  };
-
-  function marcarPortada(id: string) {
-    portadaManual.current = true;
-    setPortadaId(id);
-  }
-
-  const miniaturas = fotos.length > 0 && (
-    <>
-      <div className="miniaturas">
-        {fotos.map((f) => (
-          <div key={f.id} className={`miniatura${f.id === portadaId ? " portada" : ""}`} style={{ opacity: f.url || f.error ? 1 : 0.6 }}>
-            <button className="toque" onClick={() => marcarPortada(f.id)} aria-label="Usar como foto de la prenda">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={f.previa} alt="" />
-            </button>
-            <button className="quitar" onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(f.id)} aria-label="Quitar foto">×</button>
-            {f.id === portadaId && <span className="etiqueta-portada">Prenda</span>}
-            {f.error && <span className="aviso">No se subió</span>}
-            {!f.url && !f.error && <span className="aviso">Subiendo…</span>}
-          </div>
-        ))}
-      </div>
-      <p className="ayuda" style={{ margin: "6px 2px 0" }}>
-        {portadaId
-          ? "La marcada como Prenda se guarda como foto de referencia. Toca otra para cambiarla."
-          : "Toca la foto de la prenda para guardarla como referencia."}
-      </p>
-    </>
+  const campo = (id: CampoTexto, etiqueta: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+    <div className={claseCampo(id)}>
+      <label htmlFor={id}>{etiqueta}</label>
+      <input id={id} value={campos[id]} onChange={(ev) => cambiar(id, ev.target.value)} {...extra} />
+    </div>
   );
 
-  const ePrecio = estadoCampo("precio_usd");
-  const eKey = estadoCampo("key_item_id");
-  const eNotas = estadoCampo("notas");
+  // Foto de la prenda (portada) y fotos de etiqueta (solo para llenar datos).
+  const fotoPrenda = fotos.find((f) => f.id === portadaId) ?? null;
+  const fotosEtiqueta = fotos.filter((f) => f.id !== portadaId);
+
+  // Si Claude se equivocó, se intercambia cuál es la prenda.
+  function intercambiar() {
+    if (fotosEtiqueta.length === 0) return;
+    portadaManual.current = true;
+    setPortadaId(fotosEtiqueta[0].id);
+  }
+
+  const casilla = (titulo: string, foto: Foto | null, extra = 0) => (
+    <div className="casilla">
+      <span className="casilla-titulo">{titulo}</span>
+      {foto ? (
+        <button
+          className="casilla-foto"
+          onClick={() => confirm(`¿Quitar la foto de ${titulo.toLowerCase()}?`) && quitarFoto(foto.id)}
+          aria-label={`Quitar foto de ${titulo.toLowerCase()}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={foto.previa} alt="" />
+          {extra > 0 && <span className="casilla-extra">+{extra}</span>}
+          {foto.error && <span className="casilla-aviso">No se subió</span>}
+        </button>
+      ) : (
+        <div className="casilla-vacia">{ocupado ? "…" : "Sin foto"}</div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -365,61 +351,40 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         ))}
       </div>
 
-      <section style={{ marginBottom: 14 }}>
-        <input
-          ref={entradaFoto}
-          className="oculto"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          multiple
-          onChange={alElegirFotos}
-        />
-        {/* Sin "capture": en iPhone deja elegir de la galería o de archivos */}
-        <input
-          ref={entradaGaleria}
-          className="oculto"
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={alElegirFotos}
-        />
+      <section style={{ marginBottom: 16 }}>
+        <input ref={entradaFoto} className="oculto" type="file" accept="image/*" capture="environment" multiple onChange={alElegirFotos} />
+        {/* Sin "capture": en iPhone deja elegir de la galería */}
+        <input ref={entradaGaleria} className="oculto" type="file" accept="image/*" multiple onChange={alElegirFotos} />
+
         <button className="boton-foto" disabled={ocupado} onClick={() => entradaFoto.current?.click()}>
           <span className="circulo"><IconoCamara tam={28} /></span>
-          {fotos.length ? "Agregar otra foto" : "Tomar foto y llenar"}
-          <small>{fotos.length ? "Ej. la etiqueta o la prenda" : "Foto de la prenda + foto de la etiqueta"}</small>
+          {fotos.length === 0 ? "Tomar fotos" : "Agregar otra foto"}
+          <small>La prenda y su etiqueta</small>
         </button>
-        <button
-          className="boton ancho"
-          style={{ marginTop: 10 }}
-          disabled={ocupado}
-          onClick={() => entradaGaleria.current?.click()}
-        >
-          <IconoGaleria /> Subir desde galería
+        <button className="boton ancho" style={{ marginTop: 10 }} disabled={ocupado} onClick={() => entradaGaleria.current?.click()}>
+          <IconoGaleria /> Elegir de la galería
         </button>
 
-        {miniaturas}
+        {fotos.length > 0 && (
+          <div className="casillas">
+            {casilla("Prenda", fotoPrenda)}
+            {casilla("Etiqueta", fotosEtiqueta[0] ?? null, fotosEtiqueta.length - 1)}
+          </div>
+        )}
+        {fotos.length > 1 && !ocupado && (
+          <button className="boton chico" style={{ marginTop: 10 }} onClick={intercambiar}>
+            ⇄ Intercambiar prenda y etiqueta
+          </button>
+        )}
 
-        {(procesando || analizando) && (
-          <div className="estado ia">
-            <span className="girando" />
-            {procesando || "Leyendo etiquetas y buscando en internet…"}
-          </div>
-        )}
-        {mensaje.texto && !ocupado && (
-          <div className={`estado ${mensaje.tipo === "ok" ? "ia" : mensaje.tipo}`}>
-            {mensaje.tipo === "ok" && <IconoChispa />}
-            <span style={{ flex: 1 }}>{mensaje.texto}</span>
-          </div>
-        )}
-        {sugerenciaDept && !ocupado && (
+        {ocupado && (
           <div className="estado">
-            <span style={{ flex: 1 }}>Claude cree que es de <strong>{sugerenciaDept}</strong>.</span>
-            <button className="boton chico" onClick={() => cambiarDept(sugerenciaDept)}>Cambiar</button>
+            <span className="girando" /> Analizando…
           </div>
         )}
+        {mensaje.texto && !ocupado && <div className={`estado ${mensaje.tipo}`}>{mensaje.texto}</div>}
 
-        {fuentes.length > 0 && (
+        {fuentes.length > 0 && !ocupado && (
           <details className="tarjeta" style={{ marginTop: 14, padding: "12px 16px" }}>
             <summary>Fuentes consultadas ({fuentes.length})</summary>
             <ul className="fuentes">
@@ -436,13 +401,12 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       </section>
 
       <section className="tarjeta">
-        <p className="seccion-titulo">Prenda</p>
-        {campo("descripcion", "Descripción", { placeholder: "Ej. Suéter cuello alto de punto" })}
+        {campo("descripcion", "Prenda", { placeholder: "Ej. Suéter cuello alto" })}
 
-        <div className={`campo${eKey.clase}`}>
-          <label htmlFor="key_item_id">Key item {eKey.marca}</label>
+        <div className={claseCampo("key_item_id")}>
+          <label htmlFor="key_item_id">Key item</label>
           <select id="key_item_id" value={campos.key_item_id} onChange={(e) => cambiar("key_item_id", e.target.value)}>
-            <option value="">— Sin key item —</option>
+            <option value="">Ninguno</option>
             {keyItemsDept.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.muestras > 0 ? "✓ " : ""}{k.nombre}
@@ -456,8 +420,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           {campo("marca", "Marca")}
         </div>
 
-        <div className={`campo${precioInvalido ? "" : ePrecio.clase}`}>
-          <label htmlFor="precio_usd">Precio {ePrecio.marca}</label>
+        <div className={claseCampo("precio_usd")}>
+          <label htmlFor="precio_usd">Precio (USD)</label>
           <div className="dinero">
             <span className="prefijo">$</span>
             <input
@@ -466,34 +430,32 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
               placeholder="0.00"
               value={campos.precio_usd}
               onChange={(e) => cambiar("precio_usd", e.target.value)}
-              style={precioInvalido ? { borderColor: "var(--peligro)" } : undefined}
             />
             <span className="sufijo">USD</span>
           </div>
-          {precioInvalido ? (
-            <span className="ayuda error">Escribe solo el número, ej. 29.99</span>
-          ) : precio !== null ? (
+          {precio !== null && precio > 0 && (
             <span className="ayuda">
-              ≈ {precio * tipoCambio > 0 ? (precio * tipoCambio).toLocaleString("es-MX", { style: "currency", currency: "MXN" }) : "$0"} MXN
-              {" · "}precio de la etiqueta en tienda
+              ≈ {(precio * tipoCambio).toLocaleString("es-MX", { style: "currency", currency: "MXN" })} pesos
             </span>
-          ) : (
-            <span className="ayuda">Precio de la etiqueta en tienda</span>
           )}
         </div>
 
-        <p className="seccion-titulo" style={{ marginTop: 6 }}>Etiqueta</p>
         <div className="fila">
           {campo("talla", "Talla")}
-          {campo("color", "Color")}
-        </div>
-        {campo("tela", "Composición", { placeholder: "Ej. 60% algodón, 40% poliéster" })}
-        <div className="fila">
-          {campo("codigo", "Código de barras", { inputMode: "numeric" })}
-          {campo("estilo", "Número de estilo")}
+          {campo("tela", "Composición")}
         </div>
 
-        <p className="seccion-titulo" style={{ marginTop: 6 }}>Estatus</p>
+        <Colores
+          valor={campos.color}
+          lleno={llenosIA.has("color")}
+          alCambiar={(v) => cambiar("color", v)}
+        />
+
+        <div className="fila">
+          {campo("codigo", "Código de barras", { inputMode: "numeric" })}
+          {campo("estilo", "Estilo")}
+        </div>
+
         <div className="segmentos estatus" role="group" aria-label="Estatus">
           <button aria-pressed={status === "solo_foto"} onClick={() => setStatus("solo_foto")}>Solo foto</button>
           <button className="comprado" aria-pressed={status === "comprado"} onClick={() => setStatus("comprado")}>
@@ -501,8 +463,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           </button>
         </div>
 
-        <div className={`campo${eNotas.clase}`} style={{ marginBottom: 0 }}>
-          <label htmlFor="notas">Notas {llenosIA.has("notas") && eNotas.marca}</label>
+        <div className={claseCampo("notas")} style={{ marginBottom: 0 }}>
+          <label htmlFor="notas">Notas</label>
           <textarea id="notas" value={campos.notas} onChange={(e) => cambiar("notas", e.target.value)} />
         </div>
       </section>
@@ -520,4 +482,53 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       </div>
     </>
   );
+}
+
+// Uno o varios colores; se guardan juntos separados por coma ("Negro, Blanco").
+function Colores({ valor, lleno, alCambiar }: { valor: string; lleno: boolean; alCambiar: (v: string) => void }) {
+  const [lista, setLista] = useState<string[]>(() => separar(valor));
+
+  // Si el valor cambia desde fuera (Claude o Limpiar), se vuelve a separar.
+  useEffect(() => {
+    if (valor !== unir(lista)) setLista(separar(valor));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor]);
+
+  function actualizar(nueva: string[]) {
+    setLista(nueva);
+    alCambiar(unir(nueva));
+  }
+
+  return (
+    <div className={lleno ? "campo lleno-ia" : "campo"}>
+      <label>{lista.length > 1 ? "Colores" : "Color"}</label>
+      {lista.map((c, i) => (
+        <div key={i} style={{ display: "flex", gap: 8 }}>
+          <input
+            aria-label={`Color ${i + 1}`}
+            value={c}
+            placeholder={i === 0 ? "Ej. Negro" : "Otro color"}
+            onChange={(e) => actualizar(lista.map((x, j) => (j === i ? e.target.value : x)))}
+          />
+          {lista.length > 1 && (
+            <button className="boton" style={{ minWidth: 48, padding: 0 }} onClick={() => actualizar(lista.filter((_, j) => j !== i))} aria-label="Quitar color">
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+      <button className="boton chico" style={{ alignSelf: "flex-start" }} onClick={() => setLista([...lista, ""])}>
+        + Otro color
+      </button>
+    </div>
+  );
+}
+
+function separar(v: string): string[] {
+  const partes = v.split(/\s*[,/]\s*|\s+y\s+/i).filter(Boolean);
+  return partes.length ? partes : [""];
+}
+
+function unir(lista: string[]): string {
+  return lista.map((c) => c.trim()).filter(Boolean).join(", ");
 }

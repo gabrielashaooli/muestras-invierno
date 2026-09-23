@@ -212,9 +212,9 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: var(--texto-suave);
+  color: var(--texto);
 }
 
 .campo input,
@@ -329,7 +329,7 @@ a {
 }
 
 .ayuda {
-  font-size: 0.76rem;
+  font-size: 0.9rem;
   color: var(--texto-suave);
 }
 
@@ -481,7 +481,7 @@ a {
 }
 
 .boton-foto small {
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-weight: 500;
   opacity: 0.85;
 }
@@ -714,8 +714,8 @@ details summary {
 
 .muestra .precio.vacio-precio {
   font-weight: 500;
-  font-size: 0.8rem;
-  color: var(--pendiente);
+  font-size: 0.9rem;
+  color: var(--texto-suave);
 }
 
 .muestra .datos {
@@ -962,4 +962,113 @@ details summary {
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
+}
+
+/* ───────── Casillas Prenda / Etiqueta ───────── */
+.casillas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.casilla {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.casilla-titulo {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.casilla-foto,
+.casilla-vacia {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.casilla-foto {
+  border: 0;
+  padding: 0;
+  background: var(--superficie-2);
+  cursor: pointer;
+}
+
+.casilla-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.casilla-vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--borde);
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+}
+
+.casilla-extra,
+.casilla-aviso {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+}
+
+.casilla-aviso {
+  left: 8px;
+  right: auto;
+}
+
+/* Fotos en la lista: prenda grande + etiqueta chica */
+.fotos-muestra {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.foto-boton {
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.foto-agregar {
+  border: 2px dashed var(--borde) !important;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.etiqueta-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.etiqueta-mini img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
 }

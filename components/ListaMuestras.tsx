@@ -91,6 +91,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
       {visibles.map((m) => {
         // Primero las fotos de la prenda (portada), luego las de etiquetas.
         const todas = [...(m.fotos_prenda ?? []), ...m.fotos];
+        const prenda = m.fotos_prenda?.[0];
         const detalles = [
           m.tienda,
           m.talla && `Talla ${m.talla}`,
@@ -101,31 +102,34 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
         ].filter(Boolean);
         return (
           <article key={m.id} className="tarjeta muestra">
-            {todas[0] ? (
-              <button
-                onClick={() => setVisor({ fotos: todas, i: 0 })}
-                style={{ border: 0, padding: 0, background: "none", position: "relative", cursor: "pointer" }}
-                aria-label="Ver fotos"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="foto" src={todas[0]} alt={m.descripcion} loading="lazy" />
-                {todas.length > 1 && (
-                  <span className="insignia" style={{ position: "absolute", right: 6, bottom: 6 }}>
-                    {todas.length}
-                  </span>
-                )}
-              </button>
-            ) : (
-              <button
-                className="foto"
-                onClick={() => elegirFoto(m.id)}
-                disabled={subiendoEn === m.id}
-                style={{ border: "1px dashed var(--borde)", cursor: "pointer", flexDirection: "column", gap: 6, fontSize: "0.72rem", fontWeight: 600 }}
-              >
-                {subiendoEn === m.id ? <span className="girando" /> : <IconoCamara tam={26} />}
-                {subiendoEn === m.id ? "Subiendo…" : "Agregar foto"}
-              </button>
-            )}
+            <div className="fotos-muestra">
+              {prenda ? (
+                <button className="foto-boton" onClick={() => setVisor({ fotos: todas, i: 0 })} aria-label="Ver foto de la prenda">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="foto" src={prenda} alt={m.descripcion} loading="lazy" />
+                </button>
+              ) : (
+                <button
+                  className="foto foto-agregar"
+                  onClick={() => elegirFoto(m.id)}
+                  disabled={subiendoEn === m.id}
+                >
+                  {subiendoEn === m.id ? <span className="girando" /> : <IconoCamara tam={26} />}
+                  {subiendoEn === m.id ? "Subiendo…" : "Foto de la prenda"}
+                </button>
+              )}
+              {m.fotos[0] && (
+                <button
+                  className="foto-boton etiqueta-mini"
+                  onClick={() => setVisor({ fotos: todas, i: todas.indexOf(m.fotos[0]) })}
+                  aria-label="Ver etiqueta"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.fotos[0]} alt="Etiqueta" loading="lazy" />
+                  <span>Etiqueta</span>
+                </button>
+              )}
+            </div>
             <div style={{ minWidth: 0 }}>
               <div className="cabeza">
                 <div style={{ minWidth: 0 }}>
@@ -148,10 +152,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
               {detalles.length > 0 && <p className="datos">{detalles.join(" · ")}</p>}
               {m.notas && <p className="datos" style={{ marginTop: -4 }}>{m.notas}</p>}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="boton chico" onClick={() => elegirFoto(m.id)} disabled={subiendoEn === m.id}>
-                  <IconoCamara tam={15} /> {subiendoEn === m.id ? "Subiendo…" : "Foto de la prenda"}
-                </button>
-                <button className="boton peligro chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
+                <button className="boton chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
                   <IconoBasura tam={15} /> {borrando === m.id ? "Eliminando…" : "Eliminar"}
                 </button>
               </div>

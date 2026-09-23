@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
 import { esDepartamento } from "@/lib/tipos";
 
-// GET /api/keyitems?dept=Damas — key items con el número de muestras ligadas.
+// GET /api/keyitems?dept=Mujer — key items con el número de muestras ligadas.
 export async function GET(req: NextRequest) {
   const sql = await db();
   const dept = req.nextUrl.searchParams.get("dept");
