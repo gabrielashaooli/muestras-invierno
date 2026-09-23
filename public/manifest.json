@@ -1,0 +1,16 @@
+{
+  "name": "Muestras Invierno",
+  "short_name": "Muestras",
+  "description": "Captura de muestras de ropa para market sample shopping",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f5f2",
+  "theme_color": "#1f4e79",
+  "icons": [
+    { "src": "/icon", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-icon", "sizes": "180x180", "type": "image/png" }
+  ]
+}
