@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson, texto } from "@/lib/respuestas";
+import { parsePrecio } from "@/lib/precio";
 import { esDepartamento, type Fuente } from "@/lib/tipos";
 
 // GET /api/samples?dept=Damas — lista de muestras (más recientes primero).
@@ -27,18 +28,20 @@ export async function POST(req: NextRequest) {
   if (!esDepartamento(c.dept)) return errorJson("Departamento inválido");
 
   const status = c.status === "comprado" ? "comprado" : "solo_foto";
-  const precio = c.precio_usd === "" || c.precio_usd === null || c.precio_usd === undefined
-    ? null
-    : Number(String(c.precio_usd).replace(/[^0-9.]/g, ""));
-  if (precio !== null && !Number.isFinite(precio)) return errorJson("Precio inválido");
+  const vacio = c.precio_usd === "" || c.precio_usd === null || c.precio_usd === undefined;
+  const precio = vacio ? null : parsePrecio(c.precio_usd);
+  if (!vacio && precio === null) return errorJson("Precio inválido: escribe solo el número, ej. 29.99");
 
   const keyItemId = Number.isInteger(Number(c.key_item_id)) && Number(c.key_item_id) > 0
     ? Number(c.key_item_id)
     : null;
 
-  const fotos: string[] = Array.isArray(c.fotos)
-    ? c.fotos.filter((f: unknown): f is string => typeof f === "string" && f.startsWith("https://")).slice(0, 12)
-    : [];
+  const urls = (lista: unknown): string[] =>
+    Array.isArray(lista)
+      ? lista.filter((f: unknown): f is string => typeof f === "string" && f.startsWith("https://")).slice(0, 12)
+      : [];
+  const fotos = urls(c.fotos);
+  const fotosPrenda = urls(c.fotos_prenda);
   const fuentes: Fuente[] = Array.isArray(c.fuentes)
     ? c.fuentes
         .filter((f: Fuente) => f && typeof f.url === "string")
@@ -50,12 +53,12 @@ export async function POST(req: NextRequest) {
   const [fila] = (await sql`
     INSERT INTO samples (
       dept, status, descripcion, key_item_id, tienda, marca, precio_usd,
-      talla, color, tela, codigo, estilo, notas, fuentes, fotos
+      talla, color, tela, codigo, estilo, notas, fuentes, fotos, fotos_prenda
     ) VALUES (
       ${c.dept}, ${status}, ${texto(c.descripcion)}, ${keyItemId}, ${texto(c.tienda, 200)},
       ${texto(c.marca, 200)}, ${precio}, ${texto(c.talla, 100)}, ${texto(c.color, 100)},
       ${texto(c.tela, 300)}, ${texto(c.codigo, 100)}, ${texto(c.estilo, 100)},
-      ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb
+      ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb
     )
     RETURNING *`) as Record<string, unknown>[];
   return NextResponse.json(normalizarMuestra(fila), { status: 201 });

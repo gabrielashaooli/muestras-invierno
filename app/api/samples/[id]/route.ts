@@ -9,10 +9,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!Number.isInteger(id)) return errorJson("Id inválido");
 
   const sql = await db();
-  const filas = (await sql`DELETE FROM samples WHERE id = ${id} RETURNING fotos`) as { fotos: string[] }[];
+  const filas = (await sql`DELETE FROM samples WHERE id = ${id} RETURNING fotos, fotos_prenda`) as {
+    fotos: string[];
+    fotos_prenda: string[];
+  }[];
   if (filas.length === 0) return errorJson("No existe la muestra", 404);
 
-  const fotos = filas[0].fotos ?? [];
+  const fotos = [...(filas[0].fotos ?? []), ...(filas[0].fotos_prenda ?? [])];
   if (fotos.length > 0 && process.env.BLOB_READ_WRITE_TOKEN) {
     // Si falla el borrado de fotos no bloqueamos la respuesta.
     await del(fotos).catch((e) => console.error("No se pudieron borrar fotos", e));

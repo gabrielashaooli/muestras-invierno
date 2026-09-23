@@ -43,6 +43,8 @@ async function crearTablas() {
       fotos JSONB NOT NULL DEFAULT '[]'::jsonb,
       creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
     )`;
+  // Columna agregada después: fotos de la prenda (puesta / en modelo), aparte de las etiquetas.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS fotos_prenda JSONB NOT NULL DEFAULT '[]'::jsonb`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

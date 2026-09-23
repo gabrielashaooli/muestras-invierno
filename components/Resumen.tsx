@@ -1,120 +1,122 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { guardarLocal, leerLocal, TIPO_CAMBIO_INICIAL } from "@/lib/local";
+import { parsePrecio } from "@/lib/precio";
 import { DEPARTAMENTOS, type KeyItem, type Muestra } from "@/lib/tipos";
+import { IconoDescarga } from "./Iconos";
 
-const TC_INICIAL = 18.5;
-
-const usd = new Intl.NumberFormat("es-MX", { style: "currency", currency: "USD" });
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
+const suma = (lista: Muestra[]) => lista.reduce((t, m) => t + (m.precio_usd ?? 0), 0);
+
 export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; keyItems: KeyItem[] }) {
-  // Tipo de cambio editable; se recuerda en este dispositivo.
-  const [tipoCambio, setTipoCambio] = useState(String(TC_INICIAL));
+  // Tipo de cambio editable; se recuerda en este dispositivo. Acepta "18.5" o "18,5".
+  const [tipoCambio, setTipoCambio] = useState(String(TIPO_CAMBIO_INICIAL));
 
   useEffect(() => {
-    try {
-      const guardado = localStorage.getItem("tipoCambio");
-      if (guardado) setTipoCambio(guardado);
-    } catch {
-      /* sin almacenamiento local */
-    }
+    const guardado = leerLocal("tipoCambio");
+    if (guardado) setTipoCambio(guardado);
   }, []);
 
   function cambiarTipoCambio(valor: string) {
     setTipoCambio(valor);
-    try {
-      localStorage.setItem("tipoCambio", valor);
-    } catch {
-      /* sin almacenamiento local */
-    }
+    guardarLocal("tipoCambio", valor);
   }
 
-  const tc = Number(tipoCambio) > 0 ? Number(tipoCambio) : 0;
-  const gasto = (lista: Muestra[]) =>
-    lista.filter((m) => m.status === "comprado").reduce((suma, m) => suma + (m.precio_usd ?? 0), 0);
+  const tc = parsePrecio(tipoCambio) ?? 0;
+  const compradas = muestras.filter((m) => m.status === "comprado");
+  const gasto = suma(compradas);
+  const valorTodas = suma(muestras);
+  const sinPrecio = muestras.filter((m) => m.precio_usd === null).length;
+  const cubiertos = keyItems.filter((k) => k.muestras > 0).length;
 
   const porDept = DEPARTAMENTOS.map((d) => {
     const lista = muestras.filter((m) => m.dept === d);
+    const compradasDept = lista.filter((m) => m.status === "comprado");
     const kis = keyItems.filter((k) => k.dept === d);
     return {
       dept: d,
       total: lista.length,
-      comprados: lista.filter((m) => m.status === "comprado").length,
-      gasto: gasto(lista),
+      compradas: compradasDept.length,
+      gasto: suma(compradasDept),
       keyItems: kis.length,
       cubiertos: kis.filter((k) => k.muestras > 0).length,
     };
   });
-
-  const comprados = muestras.filter((m) => m.status === "comprado").length;
-  const gastoTotal = gasto(muestras);
-  const cubiertos = keyItems.filter((k) => k.muestras > 0).length;
+  const gastoMaximo = Math.max(1, ...porDept.map((f) => f.gasto));
 
   return (
     <>
       <div className="cifras">
+        <div className="cifra destacada">
+          <div className="rotulo">Gasto en muestras compradas</div>
+          <div className="valor">{usd.format(gasto)}</div>
+          <div className="secundario">{tc ? `${mxn.format(gasto * tc)} MXN` : "Escribe el tipo de cambio"}</div>
+        </div>
         <div className="cifra">
           <div className="valor">{muestras.length}</div>
           <div className="rotulo">Muestras</div>
         </div>
         <div className="cifra">
-          <div className="valor">{comprados}</div>
-          <div className="rotulo">Compradas · {muestras.length - comprados} solo foto</div>
+          <div className="valor">{compradas.length}</div>
+          <div className="rotulo">Compradas · {muestras.length - compradas.length} solo foto</div>
         </div>
         <div className="cifra">
-          <div className="valor">{usd.format(gastoTotal)}</div>
-          <div className="rotulo">Gasto USD</div>
+          <div className="valor" style={{ fontSize: "1.25rem" }}>{usd.format(valorTodas)}</div>
+          <div className="rotulo">Valor de todas (incluye solo foto)</div>
         </div>
         <div className="cifra">
-          <div className="valor">{mxn.format(gastoTotal * tc)}</div>
-          <div className="rotulo">Gasto MXN</div>
+          <div className="valor">{cubiertos}/{keyItems.length}</div>
+          <div className="rotulo">Key items cubiertos</div>
         </div>
       </div>
 
+      {sinPrecio > 0 && (
+        <div className="estado" style={{ marginTop: 0, marginBottom: 14 }}>
+          {sinPrecio === 1
+            ? "1 muestra no tiene precio y no suma al gasto."
+            : `${sinPrecio} muestras no tienen precio y no suman al gasto.`}
+        </div>
+      )}
+
       <section className="tarjeta">
         <div className="campo" style={{ marginBottom: 0 }}>
-          <label htmlFor="tipo-cambio">Tipo de cambio (MXN por USD)</label>
-          <input
-            id="tipo-cambio"
-            inputMode="decimal"
-            value={tipoCambio}
-            onChange={(e) => cambiarTipoCambio(e.target.value)}
-          />
+          <label htmlFor="tipo-cambio">Tipo de cambio (pesos por dólar)</label>
+          <div className="dinero">
+            <span className="prefijo">$</span>
+            <input
+              id="tipo-cambio"
+              inputMode="decimal"
+              value={tipoCambio}
+              onChange={(e) => cambiarTipoCambio(e.target.value)}
+              style={!tc ? { borderColor: "var(--peligro)" } : undefined}
+            />
+            <span className="sufijo">MXN</span>
+          </div>
         </div>
       </section>
 
       <section className="tarjeta">
         <h2>Por departamento</h2>
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Depto.</th>
-              <th>Muestras</th>
-              <th>Compradas</th>
-              <th>Key items</th>
-              <th>Gasto USD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {porDept.map((f) => (
-              <tr key={f.dept}>
-                <td>{f.dept}</td>
-                <td>{f.total}</td>
-                <td>{f.comprados}</td>
-                <td>{f.cubiertos}/{f.keyItems}</td>
-                <td>{usd.format(f.gasto)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="pequeno" style={{ marginBottom: 0 }}>
-          Key items cubiertos: {cubiertos} de {keyItems.length}. El gasto solo cuenta muestras compradas.
-        </p>
+        {porDept.map((f) => (
+          <div key={f.dept} className="depto">
+            <div className="linea">
+              <span className="nombre-depto">{f.dept}</span>
+              <span className="monto">{usd.format(f.gasto)}</span>
+            </div>
+            <div className="progreso"><span style={{ width: `${(f.gasto / gastoMaximo) * 100}%`, background: "var(--primario)" }} /></div>
+            <div className="detalle">
+              <span>{f.total} muestras · {f.compradas} compradas</span>
+              <span>Key items {f.cubiertos}/{f.keyItems}</span>
+            </div>
+          </div>
+        ))}
       </section>
 
       <a className="boton primario ancho" href="/api/export" download>
-        ⬇ Descargar CSV
+        <IconoDescarga /> Descargar CSV
       </a>
     </>
   );

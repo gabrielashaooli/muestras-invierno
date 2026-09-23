@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
+import { parsePrecio } from "@/lib/precio";
 import { esDepartamento, type Analisis, type Fuente } from "@/lib/tipos";
 
 export const maxDuration = 120; // la búsqueda web puede tardar
@@ -19,20 +20,34 @@ Recibes fotos de una prenda y de sus etiquetas (etiqueta de precio, etiqueta de 
 Sigue este orden:
 1. Lee con cuidado TODAS las etiquetas visibles: marca, número de estilo, código de barras (UPC/EAN), talla, precio, composición, color.
 2. Busca en internet con la herramienta web_search usando marca + número de estilo, o el código de barras, para completar
-   el nombre comercial de la prenda, el precio de lista en USD y la composición de la tela.
+   el nombre comercial de la prenda y la composición de la tela.
 3. Responde con el JSON final.
 
-Reglas estrictas:
-- PROHIBIDO inventar. Si un dato no se lee en las fotos ni se confirma en una fuente, deja el campo como cadena vacía "".
-- Si el precio de la etiqueta y el de internet difieren, usa el de la etiqueta y menciona el otro en "notas".
-- "precio" es solo el número en USD, sin símbolo (ej. "39.99").
-- "desc" es una descripción corta en español de la prenda (ej. "Suéter de punto trenzado cuello redondo").
-- "tela" es la composición tal cual (ej. "60% algodón, 40% poliéster").
-- "codigo" es el código de barras UPC/EAN si es legible.
-- "dept" es uno de: Damas, Caballeros, Infantiles, Bebés (o "" si no es claro).
-- "keyItemId" es el id numérico del key item de la lista que mejor corresponda, o null si ninguno aplica claramente.
-- "confianza" es "alta", "media" o "baja" según qué tanto se confirmó.
-- "notas" en español, breve: qué se confirmó en internet y cualquier discrepancia.
+Regla principal: ES MEJOR DEJAR UN CAMPO VACÍO QUE PONER UN DATO DUDOSO. La persona lo llenará a mano.
+- Solo llena un campo si lo leíste con claridad en una etiqueta o lo confirmaste en una fuente de internet
+  que corresponde exactamente a esta prenda (misma marca y mismo estilo o código).
+- Nada de aproximaciones, rangos, "posiblemente", "aprox.", "N/A", "desconocido" ni signos de interrogación:
+  en esos casos pon "".
+- Si un dato se lee a medias (borroso, cortado, tapado), pon "".
+
+Precio ("precio") — sé muy estricto:
+- Es el precio que la tienda cobra HOY por esta pieza, leído de la etiqueta física de la foto. Nunca de internet.
+- Si la etiqueta tiene varios precios (original tachado y rebaja), usa el precio de rebaja vigente,
+  solo si es inequívoco cuál aplica. Si hay duda (ej. "30% extra en caja", precio por pieza vs. por paquete), pon "".
+- Si el precio no está en dólares estadounidenses (ej. MXN, CAD, EUR), pon "" y anota el precio con su moneda en "notas".
+- Si no hay etiqueta de precio visible, pon "". Si encontraste el precio de lista en internet, escríbelo solo en "notas"
+  (ej. "Precio de lista en línea: $49.99").
+- Formato: solo el número con punto decimal, sin símbolo ni moneda (ej. "39.99").
+
+Otros campos:
+- "desc": descripción corta en español de la prenda (ej. "Suéter de punto trenzado cuello redondo").
+- "marca", "talla", "estilo", "codigo": tal como aparecen en la etiqueta. "codigo" es el UPC/EAN completo.
+- "tela": composición tal cual (ej. "60% algodón, 40% poliéster"), de la etiqueta o de una fuente confirmada.
+- "color": el color principal en español según la etiqueta o, si no hay, el que se ve claramente en la foto.
+- "dept": uno de Damas, Caballeros, Infantiles, Bebés, o "" si no es claro.
+- "keyItemId": id numérico del key item de la lista que corresponda claramente, o null.
+- "confianza": "alta", "media" o "baja".
+- "notas": en español, breve: qué se confirmó en internet, discrepancias y qué quedó sin llenar.
 
 Tu respuesta final debe ser SOLO un objeto JSON, sin texto adicional ni bloques de código, con exactamente estas llaves:
 {"desc":"","marca":"","precio":"","talla":"","color":"","tela":"","estilo":"","codigo":"","dept":"","keyItemId":null,"notas":"","confianza":""}`;
@@ -72,7 +87,19 @@ function parsearJson(texto: string): Record<string, unknown> | null {
   }
 }
 
-const cadena = (v: unknown) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
+// Valores que indican que el modelo no estaba seguro: mejor dejar el campo vacío.
+const DUDOSO = /\?|\b(aprox|posibl|probabl|quiz|descono|no visible|no legible|ilegible|n\/a|sin dato|no disponible|unknown)/i;
+
+const cadena = (v: unknown) => {
+  const s = typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "";
+  return DUDOSO.test(s) ? "" : s;
+};
+
+// El precio solo se acepta si es un número claro y razonable; si no, vacío.
+function precioSeguro(v: unknown): string {
+  const n = parsePrecio(cadena(v));
+  return n !== null && n > 0 && n < 10000 ? n.toFixed(2) : "";
+}
 
 // POST /api/analyze { imagenes: string[] (base64), dept }
 export async function POST(req: NextRequest) {
@@ -172,7 +199,7 @@ export async function POST(req: NextRequest) {
   const resultado: Analisis = {
     desc: cadena(datos.desc),
     marca: cadena(datos.marca),
-    precio: cadena(datos.precio).replace(/[^0-9.]/g, ""),
+    precio: precioSeguro(datos.precio),
     talla: cadena(datos.talla),
     color: cadena(datos.color),
     tela: cadena(datos.tela),
@@ -180,7 +207,7 @@ export async function POST(req: NextRequest) {
     codigo: cadena(datos.codigo),
     dept: esDepartamento(datos.dept) ? datos.dept : "",
     keyItemId: keyItems.some((k) => k.id === idSugerido) ? idSugerido : null,
-    notas: cadena(datos.notas),
+    notas: typeof datos.notas === "string" ? datos.notas.trim() : "",
     confianza: cadena(datos.confianza),
     fuentes: [...fuentes.values()],
   };

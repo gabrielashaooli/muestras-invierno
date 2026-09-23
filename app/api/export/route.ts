@@ -30,7 +30,8 @@ export async function GET() {
     ["Código de barras", (f) => f.codigo],
     ["Número de estilo", (f) => f.estilo],
     ["Notas", (f) => f.notas],
-    ["Fotos", (f) => ((f.fotos as string[]) ?? []).join(" ")],
+    ["Fotos prenda", (f) => ((f.fotos_prenda as string[]) ?? []).join(" ")],
+    ["Fotos etiquetas", (f) => ((f.fotos as string[]) ?? []).join(" ")],
     ["Fuentes", (f) => ((f.fuentes as Fuente[]) ?? []).map((x) => x.url).join(" ")],
     ["Creado", (f) => new Date(f.creado_en as string).toISOString()],
   ];

@@ -32,7 +32,8 @@ export interface Muestra {
   estilo: string;
   notas: string;
   fuentes: Fuente[];
-  fotos: string[];
+  fotos: string[]; // fotos de etiquetas
+  fotos_prenda: string[]; // fotos de la prenda (puesta / en modelo)
   creado_en: string;
 }
 

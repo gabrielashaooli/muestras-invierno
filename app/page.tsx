@@ -8,14 +8,15 @@ import ListaMuestras from "@/components/ListaMuestras";
 import KeyItems from "@/components/KeyItems";
 import Resumen from "@/components/Resumen";
 import Acceso from "@/components/Acceso";
+import { IconoCamara, IconoGrafica, IconoLista, IconoPrenda } from "@/components/Iconos";
 
 type Pestana = "capturar" | "muestras" | "keyitems" | "resumen";
 
-const PESTANAS: { id: Pestana; titulo: string; icono: string }[] = [
-  { id: "capturar", titulo: "Capturar", icono: "📷" },
-  { id: "muestras", titulo: "Muestras", icono: "🧥" },
-  { id: "keyitems", titulo: "Key items", icono: "✅" },
-  { id: "resumen", titulo: "Resumen", icono: "📊" },
+const PESTANAS: { id: Pestana; titulo: string; icono: React.ReactNode }[] = [
+  { id: "capturar", titulo: "Capturar", icono: <IconoCamara /> },
+  { id: "muestras", titulo: "Muestras", icono: <IconoPrenda /> },
+  { id: "keyitems", titulo: "Key items", icono: <IconoLista /> },
+  { id: "resumen", titulo: "Resumen", icono: <IconoGrafica /> },
 ];
 
 export default function Inicio() {
@@ -68,8 +69,13 @@ export default function Inicio() {
     <>
       <main className="app">
         <header className="encabezado">
-          <h1>{PESTANAS.find((p) => p.id === pestana)?.titulo}</h1>
-          <span className="pequeno">{muestras.length} muestras</span>
+          <div>
+            <p className="sobretitulo">Muestras · Invierno</p>
+            <h1>{PESTANAS.find((p) => p.id === pestana)?.titulo}</h1>
+          </div>
+          <span className="pastilla">
+            {muestras.length} {muestras.length === 1 ? "muestra" : "muestras"}
+          </span>
         </header>
 
         {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -94,7 +100,7 @@ export default function Inicio() {
             aria-selected={pestana === p.id}
             onClick={() => setPestana(p.id)}
           >
-            <span className="icono" aria-hidden>{p.icono}</span>
+            {p.icono}
             {p.titulo}
           </button>
         ))}

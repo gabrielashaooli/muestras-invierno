@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Departamento, KeyItem } from "@/lib/tipos";
 import FiltroDept from "./FiltroDept";
+import { IconoBasura, IconoLista } from "./Iconos";
 import type { ConSesion } from "./tipos";
 
 interface Props {
@@ -20,6 +21,8 @@ export default function KeyItems({ keyItems, conSesion, alCambiar }: Props) {
 
   const lista = keyItems.filter((k) => k.dept === dept);
   const cubiertos = lista.filter((k) => k.muestras > 0).length;
+  const porcentaje = lista.length ? Math.round((cubiertos / lista.length) * 100) : 0;
+  const renglones = texto.split(/\r?\n/).filter((r) => r.trim()).length;
 
   async function agregar() {
     setGuardando(true);
@@ -53,7 +56,34 @@ export default function KeyItems({ keyItems, conSesion, alCambiar }: Props) {
       <FiltroDept valor={dept} alCambiar={(d) => d && setDept(d)} conTodos={false} />
 
       <section className="tarjeta">
-        <h2>Agregar key items a {dept}</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <strong>{cubiertos} de {lista.length} con muestra</strong>
+          <span className="pequeno">{porcentaje}%</span>
+        </div>
+        <div className="progreso"><span style={{ width: `${porcentaje}%` }} /></div>
+      </section>
+
+      {lista.length === 0 ? (
+        <div className="vacio">
+          <span className="icono-vacio"><IconoLista /></span>
+          <p>Sin key items en {dept}. Pega tu lista abajo.</p>
+        </div>
+      ) : (
+        <ul className="key-items" style={{ marginBottom: 14 }}>
+          {lista.map((k) => (
+            <li key={k.id} className={k.muestras > 0 ? "cubierto" : ""}>
+              <span className="punto">{k.muestras > 0 ? k.muestras : ""}</span>
+              <span className="nombre">{k.nombre}</span>
+              <button className="boton-x" onClick={() => eliminar(k)} aria-label={`Eliminar ${k.nombre}`}>
+                <IconoBasura />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <section className="tarjeta">
+        <h2>Agregar a {dept}</h2>
         <div className="campo">
           <label htmlFor="texto-key-items">Pega la lista, uno por renglón</label>
           <textarea
@@ -64,31 +94,11 @@ export default function KeyItems({ keyItems, conSesion, alCambiar }: Props) {
             placeholder={"Chamarra puffer\nSuéter cuello alto\nPantalón cargo"}
           />
         </div>
-        <button className="boton primario ancho" onClick={agregar} disabled={!texto.trim() || guardando}>
-          {guardando ? "Agregando…" : "Agregar"}
+        <button className="boton primario ancho" onClick={agregar} disabled={!renglones || guardando}>
+          {guardando ? "Agregando…" : renglones > 1 ? `Agregar ${renglones} key items` : "Agregar"}
         </button>
         {error && <div className="estado error">{error}</div>}
       </section>
-
-      <p className="pequeno">
-        {cubiertos} de {lista.length} key items con muestra. Los verdes ya tienen al menos una.
-      </p>
-
-      {lista.length === 0 ? (
-        <p className="vacio">Sin key items en {dept}.</p>
-      ) : (
-        <ul className="key-items">
-          {lista.map((k) => (
-            <li key={k.id} className={k.muestras > 0 ? "cubierto" : ""}>
-              <span className="nombre">
-                {k.muestras > 0 ? "✓ " : ""}{k.nombre}
-              </span>
-              {k.muestras > 0 && <span className="pequeno" style={{ color: "inherit" }}>{k.muestras}</span>}
-              <button className="boton-x" onClick={() => eliminar(k)} aria-label={`Eliminar ${k.nombre}`}>×</button>
-            </li>
-          ))}
-        </ul>
-      )}
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { IconoPrenda } from "./Iconos";
 
 // Pantalla para capturar el código compartido del equipo.
 export default function Acceso({ alEntrar }: { alEntrar: () => void }) {
@@ -26,7 +27,9 @@ export default function Acceso({ alEntrar }: { alEntrar: () => void }) {
   return (
     <div className="acceso">
       <form className="tarjeta" onSubmit={entrar}>
-        <h2>Muestras Invierno</h2>
+        <div className="logo"><IconoPrenda tam={28} /></div>
+        <h2 style={{ fontSize: "1.4rem", marginBottom: 4 }}>Muestras Invierno</h2>
+        <p className="pequeno" style={{ margin: "0 0 18px" }}>Escribe el código de tu equipo para entrar.</p>
         <div className="campo">
           <label htmlFor="codigo">Código del equipo</label>
           <input
