@@ -58,6 +58,9 @@ async function crearTablas() {
             WHERE dept IN ('Damas', 'Caballeros', 'Bebés')`;
   await sql`UPDATE key_items SET dept = CASE dept WHEN 'Damas' THEN 'Mujer' WHEN 'Caballeros' THEN 'Caballero' ELSE 'Infantiles' END
             WHERE dept IN ('Damas', 'Caballeros', 'Bebés')`;
+  // Borrado suave: "Eliminar" solo oculta; nada se borra de verdad y se puede recuperar.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMPTZ`;
+  await sql`ALTER TABLE key_items ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMPTZ`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

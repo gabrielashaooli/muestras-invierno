@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
   try {
     const sql = await db();
     keyItems = (dept
-      ? await sql`SELECT id, nombre FROM key_items WHERE dept = ${dept} ORDER BY id`
-      : await sql`SELECT id, nombre FROM key_items ORDER BY id`) as { id: number; nombre: string }[];
+      ? await sql`SELECT id, nombre FROM key_items WHERE dept = ${dept} AND eliminado_en IS NULL ORDER BY id`
+      : await sql`SELECT id, nombre FROM key_items WHERE eliminado_en IS NULL ORDER BY id`) as { id: number; nombre: string }[];
   } catch (e) {
     console.error("No se pudieron leer key items", e);
   }

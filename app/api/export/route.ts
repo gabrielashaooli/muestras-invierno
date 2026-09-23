@@ -18,6 +18,7 @@ export async function GET(req: Request) {
   const filas = ((await sql`
     SELECT s.*, k.nombre AS key_item_nombre
     FROM samples s LEFT JOIN key_items k ON k.id = s.key_item_id
+    WHERE s.eliminado_en IS NULL
     ORDER BY s.dept, s.creado_en`) as Record<string, unknown>[]).map(normalizarMuestra);
 
   const columnas: [string, (f: Record<string, unknown>) => unknown][] = [

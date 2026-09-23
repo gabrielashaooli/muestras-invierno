@@ -41,8 +41,7 @@ export default function KeyItems({ keyItems, conSesion, alCambiar }: Props) {
   }
 
   async function eliminar(k: KeyItem) {
-    const aviso = k.muestras > 0 ? ` Tiene ${k.muestras} muestra(s) ligada(s); quedarán sin key item.` : "";
-    if (!confirm(`¿Eliminar "${k.nombre}"?${aviso}`)) return;
+    if (!confirm(`¿Quitar "${k.nombre}" de la lista? Sus muestras no se tocan.`)) return;
     try {
       await conSesion(() => api(`/api/keyitems/${k.id}`, { method: "DELETE" }));
       await alCambiar();

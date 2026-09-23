@@ -19,7 +19,26 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props) {
   const [filtro, setFiltro] = useState<Departamento | "">("");
   const [borrando, setBorrando] = useState<number | null>(null);
-  const [visor, setVisor] = useState<{ fotos: string[]; i: number } | null>(null);
+  // Visor de fotos: id de la muestra, todas sus fotos y cuál es la portada (prenda).
+  const [visor, setVisor] = useState<{ id: number; fotos: string[]; i: number; prenda?: string } | null>(null);
+  const [cambiandoPortada, setCambiandoPortada] = useState(false);
+
+  // Marca la foto que se está viendo como foto de la prenda. No borra ninguna foto.
+  async function usarComoPrenda() {
+    if (!visor) return;
+    setCambiandoPortada(true);
+    try {
+      await conSesion(() =>
+        api(`/api/samples/${visor.id}`, { method: "PATCH", body: JSON.stringify({ portada: visor.fotos[visor.i] }) }),
+      );
+      setVisor(null);
+      await alCambiar();
+    } catch (e) {
+      setError(`No se pudo cambiar: ${(e as Error).message}`);
+    } finally {
+      setCambiandoPortada(false);
+    }
+  }
   const [error, setError] = useState("");
   const [subiendoEn, setSubiendoEn] = useState<number | null>(null);
   const entradaFoto = useRef<HTMLInputElement>(null);
@@ -61,7 +80,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
   const visibles = filtro ? muestras.filter((m) => m.dept === filtro) : muestras;
 
   async function eliminar(m: Muestra) {
-    if (!confirm(`¿Eliminar "${m.descripcion || "muestra sin nombre"}"? También se borran sus fotos.`)) return;
+    if (!confirm(`¿Quitar "${m.descripcion || "muestra sin nombre"}" de la lista? No se borra: queda guardada y se puede recuperar.`)) return;
     setBorrando(m.id);
     setError("");
     try {
@@ -104,7 +123,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
           <article key={m.id} className="tarjeta muestra">
             <div className="fotos-muestra">
               {prenda ? (
-                <button className="foto-boton con-rotulo" onClick={() => setVisor({ fotos: todas, i: 0 })} aria-label="Ver foto de la prenda">
+                <button className="foto-boton con-rotulo" onClick={() => setVisor({ id: m.id, fotos: todas, i: 0, prenda })} aria-label="Ver foto de la prenda">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="foto" src={prenda} alt={m.descripcion} loading="lazy" />
                   <span className="rotulo-foto">Prenda</span>
@@ -122,7 +141,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
               {m.fotos[0] && (
                 <button
                   className="foto-boton etiqueta-mini"
-                  onClick={() => setVisor({ fotos: todas, i: todas.indexOf(m.fotos[0]) })}
+                  onClick={() => setVisor({ id: m.id, fotos: todas, i: todas.indexOf(m.fotos[0]), prenda })}
                   aria-label="Ver etiqueta"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -159,7 +178,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
               {m.notas && <p className="datos notas-cortas" style={{ marginTop: -4 }}>{m.notas}</p>}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="boton chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
-                  <IconoBasura tam={15} /> {borrando === m.id ? "Eliminando…" : "Eliminar"}
+                  <IconoBasura tam={15} /> {borrando === m.id ? "Quitando…" : "Quitar"}
                 </button>
               </div>
             </div>
@@ -196,9 +215,21 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
             }}
           />
           <div style={{ color: "#fff", fontSize: "0.85rem", opacity: 0.8, textAlign: "center" }}>
-            {visor.fotos.length > 1 && `${visor.i + 1} de ${visor.fotos.length} · toca la foto para la siguiente · `}
-            toca fuera para cerrar
+            {visor.fotos[visor.i] === visor.prenda ? "Foto de la prenda" : "Etiqueta / otra foto"}
+            {visor.fotos.length > 1 && ` · ${visor.i + 1} de ${visor.fotos.length} · toca la foto para ver la siguiente`}
           </div>
+          {visor.fotos[visor.i] !== visor.prenda && (
+            <button
+              className="boton chico"
+              disabled={cambiandoPortada}
+              onClick={(e) => {
+                e.stopPropagation();
+                usarComoPrenda();
+              }}
+            >
+              {cambiandoPortada ? "Cambiando…" : "Usar como foto de prenda"}
+            </button>
+          )}
           <a
             href={visor.fotos[visor.i]}
             target="_blank"
@@ -208,6 +239,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
           >
             Abrir original para guardar
           </a>
+          <span style={{ color: "#fff", fontSize: "0.8rem", opacity: 0.7 }}>Toca fuera para cerrar</span>
         </div>
       )}
     </>

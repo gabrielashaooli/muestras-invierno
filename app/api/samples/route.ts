@@ -13,11 +13,12 @@ export async function GET(req: NextRequest) {
     ? await sql`
         SELECT s.*, k.nombre AS key_item_nombre
         FROM samples s LEFT JOIN key_items k ON k.id = s.key_item_id
-        WHERE s.dept = ${dept}
+        WHERE s.dept = ${dept} AND s.eliminado_en IS NULL
         ORDER BY s.creado_en DESC`
     : await sql`
         SELECT s.*, k.nombre AS key_item_nombre
         FROM samples s LEFT JOIN key_items k ON k.id = s.key_item_id
+        WHERE s.eliminado_en IS NULL
         ORDER BY s.creado_en DESC`) as Record<string, unknown>[];
   return NextResponse.json(filas.map(normalizarMuestra));
 }

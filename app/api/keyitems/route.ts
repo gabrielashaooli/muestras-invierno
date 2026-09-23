@@ -10,12 +10,13 @@ export async function GET(req: NextRequest) {
   const filas = esDepartamento(dept)
     ? await sql`
         SELECT k.*, COUNT(s.id)::int AS muestras
-        FROM key_items k LEFT JOIN samples s ON s.key_item_id = k.id
-        WHERE k.dept = ${dept}
+        FROM key_items k LEFT JOIN samples s ON s.key_item_id = k.id AND s.eliminado_en IS NULL
+        WHERE k.dept = ${dept} AND k.eliminado_en IS NULL
         GROUP BY k.id ORDER BY k.id`
     : await sql`
         SELECT k.*, COUNT(s.id)::int AS muestras
-        FROM key_items k LEFT JOIN samples s ON s.key_item_id = k.id
+        FROM key_items k LEFT JOIN samples s ON s.key_item_id = k.id AND s.eliminado_en IS NULL
+        WHERE k.eliminado_en IS NULL
         GROUP BY k.id ORDER BY k.dept, k.id`;
   return NextResponse.json(filas);
 }
