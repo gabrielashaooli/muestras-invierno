@@ -215,17 +215,30 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     }
   }
 
-  // Etiquetas: se suben y Claude llena el formulario.
-  async function alElegirFotos(e: React.ChangeEvent<HTMLInputElement>) {
-    setProcesando("Analizando…");
+  // Con la cámara se va en dos pasos: 1. etiqueta (se analiza) y 2. prenda (solo se guarda).
+  // Con la galería se eligen varias y Claude decide cuál es la prenda.
+  const modoCamara = useRef<"etiqueta" | "prenda">("etiqueta");
+
+  function abrirCamara(modo: "etiqueta" | "prenda") {
+    modoCamara.current = modo;
+    entradaFoto.current?.click();
+  }
+
+  async function alElegirFotos(e: React.ChangeEvent<HTMLInputElement>, origen: "camara" | "galeria") {
+    const esPrenda = origen === "camara" && modoCamara.current === "prenda";
     try {
       const nuevas = await prepararFotos(e);
-      setProcesando("");
       if (nuevas.length === 0) return;
       const todas = [...fotos, ...nuevas.map((n) => n.foto)];
       setFotos(todas);
       nuevas.forEach((n) => subirFoto(n.foto, n.blob, setFotos));
-      await analizar(todas);
+
+      if (origen === "camara") portadaManual.current = true; // el orden ya dice cuál es cuál
+      if (esPrenda) {
+        setPortadaId(nuevas[0].foto.id);
+        return; // la foto de la prenda no se analiza
+      }
+      await analizar(todas.filter((f) => !(origen === "camara" && f.id === portadaId)));
     } catch (err) {
       setProcesando("");
       setMensaje({ tipo: "error", texto: (err as Error).message });
@@ -327,8 +340,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       {foto ? (
         <button
           className="casilla-foto"
-          onClick={() => confirm(`¿Quitar la foto de ${titulo.toLowerCase()}?`) && quitarFoto(foto.id)}
-          aria-label={`Quitar foto de ${titulo.toLowerCase()}`}
+          onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(foto.id)}
+          aria-label="Quitar foto"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={foto.previa} alt="" />
@@ -336,7 +349,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           {foto.error && <span className="casilla-aviso">No se subió</span>}
         </button>
       ) : (
-        <div className="casilla-vacia">{ocupado ? "…" : "Sin foto"}</div>
+        <div className="casilla-vacia">Falta</div>
       )}
     </div>
   );
@@ -352,23 +365,35 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       </div>
 
       <section style={{ marginBottom: 16 }}>
-        <input ref={entradaFoto} className="oculto" type="file" accept="image/*" capture="environment" multiple onChange={alElegirFotos} />
+        <input ref={entradaFoto} className="oculto" type="file" accept="image/*" capture="environment" onChange={(e) => alElegirFotos(e, "camara")} />
         {/* Sin "capture": en iPhone deja elegir de la galería */}
-        <input ref={entradaGaleria} className="oculto" type="file" accept="image/*" multiple onChange={alElegirFotos} />
+        <input ref={entradaGaleria} className="oculto" type="file" accept="image/*" multiple onChange={(e) => alElegirFotos(e, "galeria")} />
 
-        <button className="boton-foto" disabled={ocupado} onClick={() => entradaFoto.current?.click()}>
-          <span className="circulo"><IconoCamara tam={28} /></span>
-          {fotos.length === 0 ? "Tomar fotos" : "Agregar otra foto"}
-          <small>La prenda y su etiqueta</small>
-        </button>
+        {fotosEtiqueta.length === 0 ? (
+          <button className="boton-foto" disabled={Boolean(procesando)} onClick={() => abrirCamara("etiqueta")}>
+            <span className="circulo"><IconoCamara tam={28} /></span>
+            1. Foto de la etiqueta
+            <small>Después sigue la foto de la prenda</small>
+          </button>
+        ) : !fotoPrenda ? (
+          <button className="boton-foto" onClick={() => abrirCamara("prenda")}>
+            <span className="circulo"><IconoCamara tam={28} /></span>
+            2. Foto de la prenda
+            <small>Para verla como portada</small>
+          </button>
+        ) : (
+          <button className="boton ancho" disabled={ocupado} onClick={() => abrirCamara("etiqueta")}>
+            <IconoCamara tam={20} /> Otra foto de etiqueta
+          </button>
+        )}
         <button className="boton ancho" style={{ marginTop: 10 }} disabled={ocupado} onClick={() => entradaGaleria.current?.click()}>
           <IconoGaleria /> Elegir de la galería
         </button>
 
         {fotos.length > 0 && (
           <div className="casillas">
-            {casilla("Prenda", fotoPrenda)}
-            {casilla("Etiqueta", fotosEtiqueta[0] ?? null, fotosEtiqueta.length - 1)}
+            {casilla("1. Etiqueta", fotosEtiqueta[0] ?? null, fotosEtiqueta.length - 1)}
+            {casilla("2. Prenda", fotoPrenda)}
           </div>
         )}
         {fotos.length > 1 && !ocupado && (
