@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { del } from "@vercel/blob";
+import { tokenBlob } from "@/lib/blob";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
 
@@ -16,9 +17,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (filas.length === 0) return errorJson("No existe la muestra", 404);
 
   const fotos = [...(filas[0].fotos ?? []), ...(filas[0].fotos_prenda ?? [])];
-  if (fotos.length > 0 && process.env.BLOB_READ_WRITE_TOKEN) {
+  const token = tokenBlob();
+  if (fotos.length > 0 && token) {
     // Si falla el borrado de fotos no bloqueamos la respuesta.
-    await del(fotos).catch((e) => console.error("No se pudieron borrar fotos", e));
+    await del(fotos, { token }).catch((e) => console.error("No se pudieron borrar fotos", e));
   }
   return NextResponse.json({ ok: true });
 }

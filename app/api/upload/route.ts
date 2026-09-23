@@ -1,12 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { put } from "@vercel/blob";
+import { tokenBlob } from "@/lib/blob";
 import { errorJson } from "@/lib/respuestas";
 
 const TAMANO_MAXIMO = 4 * 1024 * 1024; // 4 MB (límite de cuerpo en Vercel ≈ 4.5 MB)
 
 // POST /api/upload (multipart, campo "foto") — sube una foto ya comprimida a Vercel Blob.
 export async function POST(req: NextRequest) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return errorJson("Falta BLOB_READ_WRITE_TOKEN", 500);
+  const token = tokenBlob();
+  if (!token) {
+    return errorJson("Falta conectar el almacenamiento de fotos (Vercel Blob) al proyecto", 500);
+  }
 
   const form = await req.formData().catch(() => null);
   const foto = form?.get("foto");
@@ -19,6 +23,7 @@ export async function POST(req: NextRequest) {
     access: "public",
     addRandomSuffix: true,
     contentType: foto.type,
+    token,
   });
   return NextResponse.json({ url: blob.url });
 }
