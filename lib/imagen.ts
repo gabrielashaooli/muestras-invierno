@@ -20,19 +20,40 @@ function cargarImagen(archivo: File): Promise<HTMLImageElement> {
   });
 }
 
+// Carga la imagen con el método disponible (createImageBitmap respeta la orientación del iPhone).
+async function decodificar(archivo: File): Promise<{ fuente: CanvasImageSource; ancho: number; alto: number }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bmp = await createImageBitmap(archivo, { imageOrientation: "from-image" });
+      return { fuente: bmp, ancho: bmp.width, alto: bmp.height };
+    } catch {
+      /* se intenta con <img> */
+    }
+  }
+  const img = await cargarImagen(archivo);
+  return { fuente: img, ancho: img.naturalWidth, alto: img.naturalHeight };
+}
+
 // Reduce la foto a 1400 px en su lado mayor y la recomprime a JPEG 0.78.
 export async function comprimirImagen(archivo: File): Promise<Blob> {
-  const img = await cargarImagen(archivo);
-  const escala = Math.min(1, LADO_MAXIMO / Math.max(img.naturalWidth, img.naturalHeight));
-  const ancho = Math.round(img.naturalWidth * escala);
-  const alto = Math.round(img.naturalHeight * escala);
+  let imagen: Awaited<ReturnType<typeof decodificar>>;
+  try {
+    imagen = await decodificar(archivo);
+  } catch (e) {
+    // Último recurso: si ya es JPEG/PNG ligero, se usa tal cual.
+    if (/^image\/(jpeg|png)$/.test(archivo.type) && archivo.size < 3.5 * 1024 * 1024) return archivo;
+    throw e;
+  }
+  const escala = Math.min(1, LADO_MAXIMO / Math.max(imagen.ancho, imagen.alto));
+  const ancho = Math.max(1, Math.round(imagen.ancho * escala));
+  const alto = Math.max(1, Math.round(imagen.alto * escala));
 
   const lienzo = document.createElement("canvas");
   lienzo.width = ancho;
   lienzo.height = alto;
   const ctx = lienzo.getContext("2d");
   if (!ctx) throw new Error("El navegador no soporta canvas");
-  ctx.drawImage(img, 0, 0, ancho, alto);
+  ctx.drawImage(imagen.fuente, 0, 0, ancho, alto);
 
   return new Promise((resolve, reject) => {
     lienzo.toBlob(

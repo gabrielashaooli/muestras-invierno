@@ -30,9 +30,9 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
     entradaFoto.current?.click();
   }
 
-  // Comprime, sube a Blob y liga las fotos de la prenda a la muestra elegida.
+  // Comprime, sube y pone la foto como portada (prenda) de la muestra elegida.
   async function alElegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const archivos = Array.from(e.target.files ?? []);
+    const archivos = Array.from(e.target.files ?? []).slice(0, 1);
     e.target.value = "";
     const id = destino.current;
     if (!archivos.length || id === null) return;
@@ -48,7 +48,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
         urls.push(r.url);
       }
       await conSesion(() =>
-        api(`/api/samples/${id}`, { method: "PATCH", body: JSON.stringify({ agregar_fotos_prenda: urls }) }),
+        api(`/api/samples/${id}`, { method: "PATCH", body: JSON.stringify({ foto_prenda: urls[0] }) }),
       );
       await alCambiar();
     } catch (err) {
@@ -77,7 +77,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
   return (
     <>
       {/* Sin "capture": en iPhone ofrece tomar foto o elegir de la galería */}
-      <input ref={entradaFoto} className="oculto" type="file" accept="image/*" multiple onChange={alElegirFoto} />
+      <input ref={entradaFoto} className="oculto" type="file" accept="image/*" onChange={alElegirFoto} />
       <FiltroDept valor={filtro} alCambiar={setFiltro} />
       {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
 
@@ -104,9 +104,10 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
           <article key={m.id} className="tarjeta muestra">
             <div className="fotos-muestra">
               {prenda ? (
-                <button className="foto-boton" onClick={() => setVisor({ fotos: todas, i: 0 })} aria-label="Ver foto de la prenda">
+                <button className="foto-boton con-rotulo" onClick={() => setVisor({ fotos: todas, i: 0 })} aria-label="Ver foto de la prenda">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="foto" src={prenda} alt={m.descripcion} loading="lazy" />
+                  <span className="rotulo-foto">Prenda</span>
                 </button>
               ) : (
                 <button
@@ -126,7 +127,12 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={m.fotos[0]} alt="Etiqueta" loading="lazy" />
-                  <span>Etiqueta</span>
+                  <span>Etiqueta{m.fotos.length > 1 ? ` (${m.fotos.length})` : ""}</span>
+                </button>
+              )}
+              {prenda && (
+                <button className="enlace-chico" onClick={() => elegirFoto(m.id)} disabled={subiendoEn === m.id}>
+                  {subiendoEn === m.id ? "Subiendo…" : "Cambiar foto de prenda"}
                 </button>
               )}
             </div>
@@ -150,7 +156,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                 {m.key_item_nombre && <span className="insignia key">{m.key_item_nombre}</span>}
               </div>
               {detalles.length > 0 && <p className="datos">{detalles.join(" · ")}</p>}
-              {m.notas && <p className="datos" style={{ marginTop: -4 }}>{m.notas}</p>}
+              {m.notas && <p className="datos notas-cortas" style={{ marginTop: -4 }}>{m.notas}</p>}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="boton chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
                   <IconoBasura tam={15} /> {borrando === m.id ? "Eliminando…" : "Eliminar"}

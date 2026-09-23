@@ -37,8 +37,9 @@ interface Foto {
   id: string;
   previa: string; // object URL local para la miniatura
   base64: string; // data URL para /api/analyze
-  url: string | null; // URL en Vercel Blob
+  url: string | null; // URL donde quedó guardada
   error: boolean;
+  blob: Blob; // se conserva para poder reintentar la subida
 }
 
 const VACIO: Campos = {
@@ -130,15 +131,23 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
 
   type SetFotos = React.Dispatch<React.SetStateAction<Foto[]>>;
 
+  // Sube la foto; si falla (señal débil en tienda, etc.) reintenta hasta 3 veces.
   async function subirFoto(foto: Foto, blob: Blob, setLista: SetFotos) {
-    const form = new FormData();
-    form.append("foto", blob, "foto.jpg");
-    try {
-      const r = await conSesion(() => api<{ url: string }>("/api/upload", { method: "POST", body: form }));
-      setLista((fs) => fs.map((f) => (f.id === foto.id ? { ...f, url: r?.url ?? null, error: !r } : f)));
-    } catch {
-      setLista((fs) => fs.map((f) => (f.id === foto.id ? { ...f, error: true } : f)));
+    setLista((fs) => fs.map((f) => (f.id === foto.id ? { ...f, error: false } : f)));
+    for (let intento = 1; intento <= 3; intento++) {
+      try {
+        const form = new FormData();
+        form.append("foto", blob, "foto.jpg");
+        const r = await conSesion(() => api<{ url: string }>("/api/upload", { method: "POST", body: form }));
+        if (!r) break;
+        setLista((fs) => fs.map((f) => (f.id === foto.id ? { ...f, url: r.url, error: false } : f)));
+        return;
+      } catch (e) {
+        console.error("Subida fallida", intento, e);
+        if (intento < 3) await new Promise((ok) => setTimeout(ok, 1500 * intento));
+      }
     }
+    setLista((fs) => fs.map((f) => (f.id === foto.id ? { ...f, error: true } : f)));
   }
 
   // Comprime los archivos elegidos y los convierte en fotos listas para subir.
@@ -156,6 +165,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           base64: await blobABase64(blob),
           url: null,
           error: false,
+          blob,
         } as Foto,
       })),
     );
@@ -219,18 +229,35 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   // Con la galería se eligen varias y Claude decide cuál es la prenda.
   const modoCamara = useRef<"etiqueta" | "prenda">("etiqueta");
 
-  function abrirCamara(modo: "etiqueta" | "prenda") {
+  const reemplazar = useRef<string | null>(null); // id de la foto que se vuelve a tomar
+
+  function abrirCamara(modo: "etiqueta" | "prenda", reemplazaId: string | null = null) {
     modoCamara.current = modo;
+    reemplazar.current = reemplazaId;
     entradaFoto.current?.click();
   }
 
   async function alElegirFotos(e: React.ChangeEvent<HTMLInputElement>, origen: "camara" | "galeria") {
     const esPrenda = origen === "camara" && modoCamara.current === "prenda";
+    const idViejo = origen === "camara" ? reemplazar.current : null;
+    reemplazar.current = null;
     try {
       const nuevas = await prepararFotos(e);
       if (nuevas.length === 0) return;
-      const todas = [...fotos, ...nuevas.map((n) => n.foto)];
+      // Al repetir una foto, la nueva ocupa el lugar de la anterior.
+      const vieja = fotos.find((f) => f.id === idViejo);
+      if (vieja) URL.revokeObjectURL(vieja.previa);
+      const todas = [...fotos.filter((f) => f.id !== idViejo), ...nuevas.map((n) => n.foto)];
       setFotos(todas);
+      if (vieja && !esPrenda) {
+        // Etiqueta repetida: se borra lo que Claude llenó con la foto anterior y se vuelve a analizar.
+        const limpio = { ...camposRef.current };
+        llenosIA.forEach((c) => { limpio[c] = ""; });
+        camposRef.current = limpio;
+        setCampos(limpio);
+        setLlenosIA(new Set());
+        setFuentes([]);
+      }
       nuevas.forEach((n) => subirFoto(n.foto, n.blob, setFotos));
 
       if (origen === "camara") portadaManual.current = true; // el orden ya dice cuál es cuál
@@ -240,8 +267,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       }
       await analizar(todas.filter((f) => !(origen === "camara" && f.id === portadaId)));
     } catch (err) {
-      setProcesando("");
-      setMensaje({ tipo: "error", texto: (err as Error).message });
+      setMensaje({ tipo: "error", texto: `No se pudo leer la foto: ${(err as Error).message}` });
+      return;
     }
   }
 
@@ -334,22 +361,36 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     setPortadaId(fotosEtiqueta[0].id);
   }
 
-  const casilla = (titulo: string, foto: Foto | null, extra = 0) => (
+  const casilla = (titulo: string, foto: Foto | null, modo: "etiqueta" | "prenda", extra = 0) => (
     <div className="casilla">
       <span className="casilla-titulo">{titulo}</span>
       {foto ? (
-        <button
-          className="casilla-foto"
-          onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(foto.id)}
-          aria-label="Quitar foto"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={foto.previa} alt="" />
-          {extra > 0 && <span className="casilla-extra">+{extra}</span>}
-          {foto.error && <span className="casilla-aviso">No se subió</span>}
-        </button>
+        <>
+          <div className="casilla-foto">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={foto.previa} alt="" />
+            {extra > 0 && <span className="casilla-extra">+{extra}</span>}
+            {!foto.url && !foto.error && <span className="casilla-aviso">Subiendo…</span>}
+            {foto.error && <span className="casilla-aviso">No se subió</span>}
+          </div>
+          <div className="casilla-acciones">
+            {foto.error ? (
+              <button className="boton chico" onClick={() => subirFoto(foto, foto.blob, setFotos)}>Reintentar</button>
+            ) : (
+              <button className="boton chico" disabled={ocupado && modo === "etiqueta"} onClick={() => abrirCamara(modo, foto.id)}>
+                Repetir
+              </button>
+            )}
+            <button className="boton chico" onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(foto.id)} aria-label="Quitar foto">
+              ×
+            </button>
+          </div>
+        </>
       ) : (
-        <div className="casilla-vacia">Falta</div>
+        <button className="casilla-vacia" onClick={() => abrirCamara(modo)} disabled={modo === "etiqueta" && ocupado}>
+          <IconoCamara tam={24} />
+          Tomar
+        </button>
       )}
     </div>
   );
@@ -392,8 +433,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
 
         {fotos.length > 0 && (
           <div className="casillas">
-            {casilla("1. Etiqueta", fotosEtiqueta[0] ?? null, fotosEtiqueta.length - 1)}
-            {casilla("2. Prenda", fotoPrenda)}
+            {casilla("1. Etiqueta", fotosEtiqueta[0] ?? null, "etiqueta", fotosEtiqueta.length - 1)}
+            {casilla("2. Prenda", fotoPrenda, "prenda")}
           </div>
         )}
         {fotos.length > 1 && !ocupado && (

@@ -19,8 +19,13 @@ export async function POST(req: NextRequest) {
   if (!token) {
     const id = crypto.randomUUID();
     const base64 = Buffer.from(await foto.arrayBuffer()).toString("base64");
-    const sql = await db();
-    await sql`INSERT INTO fotos (id, tipo, datos) VALUES (${id}, ${foto.type}, decode(${base64}, 'base64'))`;
+    try {
+      const sql = await db();
+      await sql`INSERT INTO fotos (id, tipo, datos) VALUES (${id}, ${foto.type}, decode(${base64}, 'base64'))`;
+    } catch (e) {
+      console.error("No se pudo guardar la foto en la base", e);
+      return errorJson("No se pudo guardar la foto, intenta de nuevo", 500);
+    }
     return NextResponse.json({ url: `${PREFIJO_FOTO_BD}${id}` });
   }
 

@@ -31,20 +31,21 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json({ ok: true });
 }
 
-// PATCH /api/samples/:id { agregar_fotos_prenda: string[] } — agrega fotos de la prenda a una muestra ya guardada.
+// PATCH /api/samples/:id { foto_prenda: string } — pone o cambia la foto de la prenda (portada).
+// Si ya había una, se mueve a las fotos de etiqueta para no perderla.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) return errorJson("Id inválido");
 
   const c = await req.json().catch(() => null);
-  const nuevas: string[] = Array.isArray(c?.agregar_fotos_prenda)
-    ? c.agregar_fotos_prenda.filter(urlFotoValida).slice(0, 12)
-    : [];
-  if (nuevas.length === 0) return errorJson("No hay fotos para agregar");
+  const url = c?.foto_prenda;
+  if (!urlFotoValida(url)) return errorJson("Foto inválida");
 
   const sql = await db();
   const filas = (await sql`
-    UPDATE samples SET fotos_prenda = fotos_prenda || ${JSON.stringify(nuevas)}::jsonb
+    UPDATE samples
+    SET fotos = fotos_prenda || fotos,
+        fotos_prenda = jsonb_build_array(${url}::text)
     WHERE id = ${id}
     RETURNING *`) as Record<string, unknown>[];
   if (filas.length === 0) return errorJson("No existe la muestra", 404);
