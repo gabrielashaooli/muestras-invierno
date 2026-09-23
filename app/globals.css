@@ -1121,3 +1121,82 @@ details summary {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Menú ⋯ (hoja inferior) */
+.boton-menu {
+  font-size: 1.3rem;
+  line-height: 1;
+  min-width: 48px;
+  letter-spacing: 1px;
+}
+
+.hoja-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.hoja {
+  width: 100%;
+  max-width: 560px;
+  background: var(--superficie);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 12px calc(var(--seguro-abajo) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hoja-titulo {
+  margin: 6px 8px 4px;
+  font-weight: 700;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hoja button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--superficie-2);
+  font-size: 1.02rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hoja button small {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.hoja button:disabled {
+  opacity: 0.5;
+}
+
+.hoja button.peligro {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--peligro);
+}
+
+.hoja button.cancelar {
+  align-items: center;
+  background: none;
+  color: var(--texto-suave);
+}

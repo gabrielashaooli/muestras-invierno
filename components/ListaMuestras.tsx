@@ -19,6 +19,22 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props) {
   const [filtro, setFiltro] = useState<Departamento | "">("");
   const [borrando, setBorrando] = useState<number | null>(null);
+  const [menu, setMenu] = useState<Muestra | null>(null); // menú ⋯ abierto
+  const [analizandoEn, setAnalizandoEn] = useState<number | null>(null);
+
+  // Vuelve a analizar con Claude las fotos guardadas; solo llena lo que está vacío.
+  async function analizarMuestra(m: Muestra) {
+    setAnalizandoEn(m.id);
+    setError("");
+    try {
+      await conSesion(() => api(`/api/samples/${m.id}/analizar`, { method: "POST" }));
+      await alCambiar();
+    } catch (e) {
+      setError(`No se pudo analizar: ${(e as Error).message}`);
+    } finally {
+      setAnalizandoEn(null);
+    }
+  }
   // Visor de fotos: id de la muestra, todas sus fotos y cuál es la portada (prenda).
   const [visor, setVisor] = useState<{ id: number; fotos: string[]; i: number; prenda?: string } | null>(null);
   const [cambiandoPortada, setCambiandoPortada] = useState(false);
@@ -149,11 +165,6 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                   <span>Etiqueta{m.fotos.length > 1 ? ` (${m.fotos.length})` : ""}</span>
                 </button>
               )}
-              {prenda && (
-                <button className="enlace-chico" onClick={() => elegirFoto(m.id)} disabled={subiendoEn === m.id}>
-                  {subiendoEn === m.id ? "Subiendo…" : "Cambiar foto de prenda"}
-                </button>
-              )}
             </div>
             <div style={{ minWidth: 0 }}>
               <div className="cabeza">
@@ -176,15 +187,78 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
               </div>
               {detalles.length > 0 && <p className="datos">{detalles.join(" · ")}</p>}
               {m.notas && <p className="datos notas-cortas" style={{ marginTop: -4 }}>{m.notas}</p>}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="boton chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
-                  <IconoBasura tam={15} /> {borrando === m.id ? "Quitando…" : "Quitar"}
-                </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span className="pequeno">
+                  {analizandoEn === m.id ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span className="girando" /> Analizando…</span>
+                  ) : subiendoEn === m.id ? (
+                    "Subiendo foto…"
+                  ) : borrando === m.id ? (
+                    "Quitando…"
+                  ) : !m.descripcion && !m.marca ? (
+                    "Sin analizar"
+                  ) : null}
+                </span>
+                <button className="boton chico boton-menu" onClick={() => setMenu(m)} aria-label="Más opciones">⋯</button>
               </div>
             </div>
           </article>
         );
       })}
+
+      {menu && (
+        <div className="hoja-fondo" onClick={() => setMenu(null)}>
+          <div className="hoja" role="menu" onClick={(e) => e.stopPropagation()}>
+            <p className="hoja-titulo">{menu.descripcion || "Muestra sin nombre"}</p>
+            <button
+              role="menuitem"
+              disabled={analizandoEn !== null || [...menu.fotos, ...(menu.fotos_prenda ?? [])].length === 0}
+              onClick={() => {
+                const m = menu;
+                setMenu(null);
+                analizarMuestra(m);
+              }}
+            >
+              Analizar con Claude
+              <small>Llena lo que falte, no cambia lo que ya tiene</small>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                const m = menu;
+                setMenu(null);
+                elegirFoto(m.id);
+              }}
+            >
+              {menu.fotos_prenda?.[0] ? "Cambiar foto de prenda" : "Agregar foto de prenda"}
+            </button>
+            {[...(menu.fotos_prenda ?? []), ...menu.fotos].length > 0 && (
+              <button
+                role="menuitem"
+                onClick={() => {
+                  const todas = [...(menu.fotos_prenda ?? []), ...menu.fotos];
+                  setVisor({ id: menu.id, fotos: todas, i: 0, prenda: menu.fotos_prenda?.[0] });
+                  setMenu(null);
+                }}
+              >
+                Ver fotos
+              </button>
+            )}
+            <button
+              role="menuitem"
+              className="peligro"
+              onClick={() => {
+                const m = menu;
+                setMenu(null);
+                eliminar(m);
+              }}
+            >
+              <IconoBasura tam={16} /> Quitar de la lista
+            </button>
+            <button className="cancelar" onClick={() => setMenu(null)}>Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {visor && (
         <div
