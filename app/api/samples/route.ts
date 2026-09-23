@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson, texto } from "@/lib/respuestas";
+import { urlFotoValida } from "@/lib/blob";
 import { parsePrecio } from "@/lib/precio";
 import { esDepartamento, type Fuente } from "@/lib/tipos";
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const urls = (lista: unknown): string[] =>
     Array.isArray(lista)
-      ? lista.filter((f: unknown): f is string => typeof f === "string" && f.startsWith("https://")).slice(0, 12)
+      ? lista.filter(urlFotoValida).slice(0, 12)
       : [];
   const fotos = urls(c.fotos);
   const fotosPrenda = urls(c.fotos_prenda);

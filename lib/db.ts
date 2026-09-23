@@ -45,6 +45,14 @@ async function crearTablas() {
     )`;
   // Columna agregada después: fotos de la prenda (puesta / en modelo), aparte de las etiquetas.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS fotos_prenda JSONB NOT NULL DEFAULT '[]'::jsonb`;
+  // Fotos guardadas en la base cuando no hay Vercel Blob configurado.
+  await sql`
+    CREATE TABLE IF NOT EXISTS fotos (
+      id UUID PRIMARY KEY,
+      tipo TEXT NOT NULL,
+      datos BYTEA NOT NULL,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { del } from "@vercel/blob";
-import { tokenBlob } from "@/lib/blob";
+import { PREFIJO_FOTO_BD, tokenBlob, urlFotoValida } from "@/lib/blob";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
 
@@ -17,10 +17,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (filas.length === 0) return errorJson("No existe la muestra", 404);
 
   const fotos = [...(filas[0].fotos ?? []), ...(filas[0].fotos_prenda ?? [])];
+  // Fotos guardadas en la base de datos.
+  const idsBd = fotos.filter((f) => f.startsWith(PREFIJO_FOTO_BD)).map((f) => f.slice(PREFIJO_FOTO_BD.length));
+  if (idsBd.length > 0) await sql`DELETE FROM fotos WHERE id = ANY(${idsBd}::uuid[])`;
+
+  // Fotos en Vercel Blob.
+  const enBlob = fotos.filter((f) => f.startsWith("https://"));
   const token = tokenBlob();
-  if (fotos.length > 0 && token) {
+  if (enBlob.length > 0 && token) {
     // Si falla el borrado de fotos no bloqueamos la respuesta.
-    await del(fotos, { token }).catch((e) => console.error("No se pudieron borrar fotos", e));
+    await del(enBlob, { token }).catch((e) => console.error("No se pudieron borrar fotos", e));
   }
   return NextResponse.json({ ok: true });
 }
@@ -32,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const c = await req.json().catch(() => null);
   const nuevas: string[] = Array.isArray(c?.agregar_fotos_prenda)
-    ? c.agregar_fotos_prenda.filter((f: unknown): f is string => typeof f === "string" && f.startsWith("https://")).slice(0, 12)
+    ? c.agregar_fotos_prenda.filter(urlFotoValida).slice(0, 12)
     : [];
   if (nuevas.length === 0) return errorJson("No hay fotos para agregar");
 

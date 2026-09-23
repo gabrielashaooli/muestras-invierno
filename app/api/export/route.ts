@@ -8,7 +8,12 @@ function celda(valor: unknown): string {
 }
 
 // GET /api/export — CSV con BOM para que Excel respete acentos.
-export async function GET() {
+export async function GET(req: Request) {
+  // Las fotos guardadas en la base tienen ruta relativa; en el CSV van completas.
+  const origen = new URL(req.url).origin;
+  const absolutas = (lista: unknown) =>
+    ((lista as string[]) ?? []).map((u) => (u.startsWith("/") ? origen + u : u)).join(" ");
+
   const sql = await db();
   const filas = ((await sql`
     SELECT s.*, k.nombre AS key_item_nombre
@@ -30,8 +35,8 @@ export async function GET() {
     ["Código de barras", (f) => f.codigo],
     ["Número de estilo", (f) => f.estilo],
     ["Notas", (f) => f.notas],
-    ["Fotos prenda", (f) => ((f.fotos_prenda as string[]) ?? []).join(" ")],
-    ["Fotos etiquetas", (f) => ((f.fotos as string[]) ?? []).join(" ")],
+    ["Fotos prenda", (f) => absolutas(f.fotos_prenda)],
+    ["Fotos etiquetas", (f) => absolutas(f.fotos)],
     ["Fuentes", (f) => ((f.fuentes as Fuente[]) ?? []).map((x) => x.url).join(" ")],
     ["Creado", (f) => new Date(f.creado_en as string).toISOString()],
   ];
