@@ -509,6 +509,31 @@ a {
   cursor: pointer;
 }
 
+.miniatura .toque {
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  display: block;
+}
+
+.miniatura.portada img {
+  outline: 3px solid var(--exito);
+  outline-offset: -3px;
+}
+
+.miniatura .etiqueta-portada {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--exito);
+  color: #fff;
+}
+
 .miniatura img {
   width: 84px;
   height: 104px;
@@ -518,6 +543,9 @@ a {
 }
 
 .miniatura .quitar {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
   position: absolute;
   top: 5px;
   right: 5px;

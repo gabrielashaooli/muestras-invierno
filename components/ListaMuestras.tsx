@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { comprimirImagen } from "@/lib/imagen";
 import type { Departamento, Muestra } from "@/lib/tipos";
 import FiltroDept from "./FiltroDept";
-import { IconoBasura, IconoPrenda } from "./Iconos";
+import { IconoBasura, IconoCamara, IconoPrenda } from "./Iconos";
 import type { ConSesion } from "./tipos";
 
 interface Props {
@@ -20,6 +21,42 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
   const [borrando, setBorrando] = useState<number | null>(null);
   const [visor, setVisor] = useState<{ fotos: string[]; i: number } | null>(null);
   const [error, setError] = useState("");
+  const [subiendoEn, setSubiendoEn] = useState<number | null>(null);
+  const entradaFoto = useRef<HTMLInputElement>(null);
+  const destino = useRef<number | null>(null); // muestra a la que se agregará la foto
+
+  function elegirFoto(id: number) {
+    destino.current = id;
+    entradaFoto.current?.click();
+  }
+
+  // Comprime, sube a Blob y liga las fotos de la prenda a la muestra elegida.
+  async function alElegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivos = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const id = destino.current;
+    if (!archivos.length || id === null) return;
+    setSubiendoEn(id);
+    setError("");
+    try {
+      const urls: string[] = [];
+      for (const archivo of archivos) {
+        const form = new FormData();
+        form.append("foto", await comprimirImagen(archivo), "foto.jpg");
+        const r = await conSesion(() => api<{ url: string }>("/api/upload", { method: "POST", body: form }));
+        if (!r) return;
+        urls.push(r.url);
+      }
+      await conSesion(() =>
+        api(`/api/samples/${id}`, { method: "PATCH", body: JSON.stringify({ agregar_fotos_prenda: urls }) }),
+      );
+      await alCambiar();
+    } catch (err) {
+      setError(`No se pudo subir la foto: ${(err as Error).message}`);
+    } finally {
+      setSubiendoEn(null);
+    }
+  }
 
   const visibles = filtro ? muestras.filter((m) => m.dept === filtro) : muestras;
 
@@ -39,6 +76,8 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
 
   return (
     <>
+      {/* Sin "capture": en iPhone ofrece tomar foto o elegir de la galería */}
+      <input ref={entradaFoto} className="oculto" type="file" accept="image/*" multiple onChange={alElegirFoto} />
       <FiltroDept valor={filtro} alCambiar={setFiltro} />
       {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
 
@@ -77,7 +116,15 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                 )}
               </button>
             ) : (
-              <div className="foto" aria-hidden><IconoPrenda tam={30} /></div>
+              <button
+                className="foto"
+                onClick={() => elegirFoto(m.id)}
+                disabled={subiendoEn === m.id}
+                style={{ border: "1px dashed var(--borde)", cursor: "pointer", flexDirection: "column", gap: 6, fontSize: "0.72rem", fontWeight: 600 }}
+              >
+                {subiendoEn === m.id ? <span className="girando" /> : <IconoCamara tam={26} />}
+                {subiendoEn === m.id ? "Subiendo…" : "Agregar foto"}
+              </button>
             )}
             <div style={{ minWidth: 0 }}>
               <div className="cabeza">
@@ -100,9 +147,14 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
               </div>
               {detalles.length > 0 && <p className="datos">{detalles.join(" · ")}</p>}
               {m.notas && <p className="datos" style={{ marginTop: -4 }}>{m.notas}</p>}
-              <button className="boton peligro chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
-                <IconoBasura tam={15} /> {borrando === m.id ? "Eliminando…" : "Eliminar"}
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="boton chico" onClick={() => elegirFoto(m.id)} disabled={subiendoEn === m.id}>
+                  <IconoCamara tam={15} /> {subiendoEn === m.id ? "Subiendo…" : "Foto de la prenda"}
+                </button>
+                <button className="boton peligro chico" onClick={() => eliminar(m)} disabled={borrando === m.id}>
+                  <IconoBasura tam={15} /> {borrando === m.id ? "Eliminando…" : "Eliminar"}
+                </button>
+              </div>
             </div>
           </article>
         );

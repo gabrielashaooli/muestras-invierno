@@ -16,6 +16,7 @@ type TipoImagen = (typeof TIPOS_IMAGEN)[number];
 
 const INSTRUCCIONES = `Eres un asistente de compras de muestras (market sample shopping) para un equipo de diseño de ropa.
 Recibes fotos de una prenda y de sus etiquetas (etiqueta de precio, etiqueta de cuidado/composición, código de barras).
+Las fotos vienen numeradas desde 0 en el orden en que se enviaron.
 
 Sigue este orden:
 1. Lee con cuidado TODAS las etiquetas visibles: marca, número de estilo, código de barras (UPC/EAN), talla, precio, composición, color.
@@ -47,10 +48,11 @@ Otros campos:
 - "dept": uno de Damas, Caballeros, Infantiles, Bebés, o "" si no es claro.
 - "keyItemId": id numérico del key item de la lista que corresponda claramente, o null.
 - "confianza": "alta", "media" o "baja".
+- "fotoPrenda": número de la foto (desde 0) que mejor muestra la prenda completa (no una etiqueta), o null si todas son etiquetas.
 - "notas": en español, breve: qué se confirmó en internet, discrepancias y qué quedó sin llenar.
 
 Tu respuesta final debe ser SOLO un objeto JSON, sin texto adicional ni bloques de código, con exactamente estas llaves:
-{"desc":"","marca":"","precio":"","talla":"","color":"","tela":"","estilo":"","codigo":"","dept":"","keyItemId":null,"notas":"","confianza":""}`;
+{"desc":"","marca":"","precio":"","talla":"","color":"","tela":"","estilo":"","codigo":"","dept":"","keyItemId":null,"notas":"","confianza":"","fotoPrenda":null}`;
 
 // Quita el prefijo data:...;base64, si viene incluido.
 function limpiarImagen(entrada: unknown): { data: string; media_type: TipoImagen } | null {
@@ -138,10 +140,10 @@ export async function POST(req: NextRequest) {
     {
       role: "user",
       content: [
-        ...imagenes.map((img): Anthropic.ImageBlockParam => ({
-          type: "image",
-          source: { type: "base64", media_type: img.media_type, data: img.data },
-        })),
+        ...imagenes.flatMap((img, i): Anthropic.ContentBlockParam[] => [
+          { type: "text", text: `Foto ${i}:` },
+          { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
+        ]),
         { type: "text", text: `${contexto}\n\nAnaliza la prenda y responde solo con el JSON.` },
       ],
     },
@@ -209,6 +211,10 @@ export async function POST(req: NextRequest) {
     keyItemId: keyItems.some((k) => k.id === idSugerido) ? idSugerido : null,
     notas: typeof datos.notas === "string" ? datos.notas.trim() : "",
     confianza: cadena(datos.confianza),
+    fotoPrenda:
+      Number.isInteger(datos.fotoPrenda) && (datos.fotoPrenda as number) >= 0 && (datos.fotoPrenda as number) < imagenes.length
+        ? (datos.fotoPrenda as number)
+        : null,
     fuentes: [...fuentes.values()],
   };
   return NextResponse.json(resultado);

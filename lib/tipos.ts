@@ -59,5 +59,6 @@ export interface Analisis {
   keyItemId: number | null;
   notas: string;
   confianza: string;
+  fotoPrenda: number | null; // índice de la foto que muestra la prenda
   fuentes: Fuente[];
 }

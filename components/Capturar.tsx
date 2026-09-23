@@ -80,7 +80,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   const [status, setStatus] = useState<Estatus>("solo_foto");
   const [campos, setCampos] = useState<Campos>(VACIO);
   const [fotos, setFotos] = useState<Foto[]>([]); // etiquetas: se analizan con Claude
-  const [fotosPrenda, setFotosPrenda] = useState<Foto[]>([]); // prenda: solo se guardan para verla
+  const [portadaId, setPortadaId] = useState<string | null>(null); // foto de la prenda (referencia)
+  const portadaManual = useRef(false); // true si la persona eligió la foto de la prenda a mano
   const [fuentes, setFuentes] = useState<Fuente[]>([]);
   const [llenosIA, setLlenosIA] = useState<Set<keyof Campos>>(new Set());
   const [analizado, setAnalizado] = useState(false); // ya corrió el análisis al menos una vez
@@ -92,8 +93,6 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   const [guardando, setGuardando] = useState(false);
   const entradaFoto = useRef<HTMLInputElement>(null);
   const entradaGaleria = useRef<HTMLInputElement>(null);
-  const entradaPrendaCamara = useRef<HTMLInputElement>(null);
-  const entradaPrendaGaleria = useRef<HTMLInputElement>(null);
   const camposRef = useRef(campos);
   camposRef.current = campos;
 
@@ -108,7 +107,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   }, []);
 
   const keyItemsDept = keyItems.filter((k) => k.dept === dept);
-  const subiendo = [...fotos, ...fotosPrenda].some((f) => !f.url && !f.error);
+  const subiendo = fotos.some((f) => !f.url && !f.error);
 
   function cambiarDept(d: Departamento) {
     setDept(d);
@@ -175,6 +174,12 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       );
       if (!r) return;
 
+      // Claude indica cuál foto muestra la prenda; se usa como foto de referencia.
+      const enviadas = todas.slice(-MAX_FOTOS_ANALISIS);
+      if (!portadaManual.current && r.fotoPrenda !== null && enviadas[r.fotoPrenda]) {
+        setPortadaId(enviadas[r.fotoPrenda].id);
+      }
+
       // Se parte del valor más reciente del formulario (el usuario pudo editar mientras tanto).
       const n = { ...camposRef.current };
       const llenados: (keyof Campos)[] = [];
@@ -231,19 +236,12 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     }
   }
 
-  // Prenda: solo se sube y se guarda (no se analiza).
-  async function alElegirPrenda(e: React.ChangeEvent<HTMLInputElement>) {
-    try {
-      const nuevas = await prepararFotos(e);
-      setFotosPrenda((fs) => [...fs, ...nuevas.map((n) => n.foto)]);
-      nuevas.forEach((n) => subirFoto(n.foto, n.blob, setFotosPrenda));
-    } catch (err) {
-      setMensaje({ tipo: "error", texto: (err as Error).message });
+  function quitarFoto(id: string) {
+    if (id === portadaId) {
+      setPortadaId(null);
+      portadaManual.current = false;
     }
-  }
-
-  function quitarFoto(id: string, setLista: SetFotos) {
-    setLista((fs) => {
+    setFotos((fs) => {
       const f = fs.find((x) => x.id === id);
       if (f) URL.revokeObjectURL(f.previa);
       return fs.filter((x) => x.id !== id);
@@ -251,9 +249,10 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   }
 
   function limpiar() {
-    [...fotos, ...fotosPrenda].forEach((f) => URL.revokeObjectURL(f.previa));
+    fotos.forEach((f) => URL.revokeObjectURL(f.previa));
     setFotos([]);
-    setFotosPrenda([]);
+    setPortadaId(null);
+    portadaManual.current = false;
     setFuentes([]);
     setLlenosIA(new Set());
     setAnalizado(false);
@@ -267,7 +266,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       setMensaje({ tipo: "error", texto: "Revisa el precio: escribe solo el número, ej. 29.99" });
       return;
     }
-    const fallidas = [...fotos, ...fotosPrenda].filter((f) => f.error).length;
+    const fallidas = fotos.filter((f) => f.error).length;
     if (fallidas && !confirm(`${fallidas} foto(s) no se subieron. ¿Guardar sin ellas?`)) return;
 
     setGuardando(true);
@@ -281,8 +280,9 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
             status,
             key_item_id: campos.key_item_id ? Number(campos.key_item_id) : null,
             precio_usd: precio,
-            fotos: fotos.filter((f) => f.url).map((f) => f.url),
-            fotos_prenda: fotosPrenda.filter((f) => f.url).map((f) => f.url),
+            // La foto de la prenda se guarda aparte como referencia; las demás son etiquetas.
+            fotos: fotos.filter((f) => f.url && f.id !== portadaId).map((f) => f.url),
+            fotos_prenda: fotos.filter((f) => f.url && f.id === portadaId).map((f) => f.url),
             fuentes,
           }),
         }),
@@ -299,7 +299,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   }
 
   const ocupado = Boolean(procesando) || analizando;
-  const hayDatos = fotos.length + fotosPrenda.length > 0 || Object.entries(campos).some(([k, v]) => k !== "tienda" && v.trim());
+  const hayDatos = fotos.length > 0 || Object.entries(campos).some(([k, v]) => k !== "tienda" && v.trim());
   const precio = parsePrecio(campos.precio_usd);
   const precioInvalido = campos.precio_usd.trim() !== "" && precio === null;
 
@@ -322,26 +322,34 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     );
   };
 
-  const miniaturas = (lista: Foto[], setLista: SetFotos) =>
-    lista.length > 0 && (
+  function marcarPortada(id: string) {
+    portadaManual.current = true;
+    setPortadaId(id);
+  }
+
+  const miniaturas = fotos.length > 0 && (
+    <>
       <div className="miniaturas">
-        {lista.map((f) => (
-          <button
-            key={f.id}
-            className="miniatura"
-            onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(f.id, setLista)}
-            style={{ opacity: f.url || f.error ? 1 : 0.6 }}
-            aria-label="Quitar foto"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={f.previa} alt="" />
-            <span className="quitar" aria-hidden>×</span>
+        {fotos.map((f) => (
+          <div key={f.id} className={`miniatura${f.id === portadaId ? " portada" : ""}`} style={{ opacity: f.url || f.error ? 1 : 0.6 }}>
+            <button className="toque" onClick={() => marcarPortada(f.id)} aria-label="Usar como foto de la prenda">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={f.previa} alt="" />
+            </button>
+            <button className="quitar" onClick={() => confirm("¿Quitar esta foto?") && quitarFoto(f.id)} aria-label="Quitar foto">×</button>
+            {f.id === portadaId && <span className="etiqueta-portada">Prenda</span>}
             {f.error && <span className="aviso">No se subió</span>}
             {!f.url && !f.error && <span className="aviso">Subiendo…</span>}
-          </button>
+          </div>
         ))}
       </div>
-    );
+      <p className="ayuda" style={{ margin: "6px 2px 0" }}>
+        {portadaId
+          ? "La marcada como Prenda se guarda como foto de referencia. Toca otra para cambiarla."
+          : "Toca la foto de la prenda para guardarla como referencia."}
+      </p>
+    </>
+  );
 
   const ePrecio = estadoCampo("precio_usd");
   const eKey = estadoCampo("key_item_id");
@@ -357,25 +365,6 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         ))}
       </div>
 
-      <section className="tarjeta">
-        <p className="seccion-titulo" style={{ marginTop: 0 }}>Foto de la prenda</p>
-        <p className="pequeno" style={{ margin: "-6px 0 12px" }}>
-          Para ver cómo se ve la prenda (puesta o en modelo). Solo se guarda, no se analiza.
-        </p>
-        <input ref={entradaPrendaCamara} className="oculto" type="file" accept="image/*" capture="environment" multiple onChange={alElegirPrenda} />
-        <input ref={entradaPrendaGaleria} className="oculto" type="file" accept="image/*" multiple onChange={alElegirPrenda} />
-        <div className="fila" style={{ gap: 10 }}>
-          <button className="boton" onClick={() => entradaPrendaCamara.current?.click()}>
-            <IconoCamara tam={20} /> Cámara
-          </button>
-          <button className="boton" onClick={() => entradaPrendaGaleria.current?.click()}>
-            <IconoGaleria /> Galería
-          </button>
-        </div>
-        {miniaturas(fotosPrenda, setFotosPrenda)}
-      </section>
-
-      <p className="seccion-titulo">Etiquetas · Claude llena los datos</p>
       <section style={{ marginBottom: 14 }}>
         <input
           ref={entradaFoto}
@@ -397,8 +386,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         />
         <button className="boton-foto" disabled={ocupado} onClick={() => entradaFoto.current?.click()}>
           <span className="circulo"><IconoCamara tam={28} /></span>
-          {fotos.length ? "Agregar fotos y volver a llenar" : "Tomar foto y llenar"}
-          <small>Etiquetas de precio, composición y código de barras</small>
+          {fotos.length ? "Agregar otra foto" : "Tomar foto y llenar"}
+          <small>{fotos.length ? "Ej. la etiqueta o la prenda" : "Foto de la prenda + foto de la etiqueta"}</small>
         </button>
         <button
           className="boton ancho"
@@ -406,10 +395,10 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           disabled={ocupado}
           onClick={() => entradaGaleria.current?.click()}
         >
-          <IconoGaleria /> Subir etiquetas desde galería
+          <IconoGaleria /> Subir desde galería
         </button>
 
-        {miniaturas(fotos, setFotos)}
+        {miniaturas}
 
         {(procesando || analizando) && (
           <div className="estado ia">
