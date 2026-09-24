@@ -30,6 +30,8 @@ export async function GET(req: Request) {
     ["Tienda", (f) => f.tienda],
     ["Marca", (f) => f.marca],
     ["Precio USD", (f) => f.precio_usd],
+    ["Cantidad", (f) => f.cantidad],
+    ["Total USD", (f) => (f.precio_usd === null ? "" : Math.round((f.precio_usd as number) * (f.cantidad as number) * 100) / 100)],
     ["Talla", (f) => f.talla],
     ["Color", (f) => f.color],
     ["Composición", (f) => f.tela],

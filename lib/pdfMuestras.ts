@@ -153,7 +153,13 @@ export async function generarPdfMuestras(
     }
     y -= 2;
 
-    const precio = m.precio_usd !== null ? usd.format(m.precio_usd) : "Sin precio";
+    const cant = m.cantidad ?? 1;
+    const precio =
+      m.precio_usd === null
+        ? `Sin precio${cant > 1 ? ` · ${cant} pzas` : ""}`
+        : cant > 1
+          ? `${usd.format(m.precio_usd)} x ${cant} = ${usd.format(m.precio_usd * cant)}`
+          : usd.format(m.precio_usd);
     const estatus = m.status === "comprado" ? "COMPRADO" : "Solo foto";
     p.drawText(precio, { x: xTexto, y, size: 12, font: negrita, color: NEGRO });
     const anchoPrecio = negrita.widthOfTextAtSize(precio, 12);

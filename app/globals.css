@@ -1232,3 +1232,60 @@ details summary {
   background: var(--exito);
   color: #fff;
 }
+
+/* Cantidad de piezas */
+.cantidad {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--superficie-2);
+  align-self: flex-start;
+}
+
+.cantidad button {
+  width: 44px;
+  height: 40px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--superficie);
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.cantidad button:disabled {
+  opacity: 0.4;
+}
+
+.cantidad span {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cantidad.chico {
+  margin: 0 8px 8px 0;
+}
+
+.cantidad.chico button {
+  width: 34px;
+  height: 32px;
+  font-size: 1.1rem;
+}
+
+.cantidad.chico span {
+  min-width: 52px;
+  font-size: 0.9rem;
+}
+
+.precio-total {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  text-align: right;
+}

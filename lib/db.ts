@@ -61,6 +61,8 @@ async function crearTablas() {
   // Borrado suave: "Eliminar" solo oculta; nada se borra de verdad y se puede recuperar.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMPTZ`;
   await sql`ALTER TABLE key_items ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMPTZ`;
+  // Cantidad de piezas de cada muestra (las existentes quedan en 1).
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }
@@ -83,5 +85,6 @@ export function normalizarMuestra(fila: Record<string, unknown>) {
   return {
     ...fila,
     precio_usd: fila.precio_usd === null || fila.precio_usd === undefined ? null : Number(fila.precio_usd),
+    cantidad: Number(fila.cantidad ?? 1) || 1,
   };
 }

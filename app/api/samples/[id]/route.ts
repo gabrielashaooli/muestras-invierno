@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { urlFotoValida } from "@/lib/blob";
+import { cantidadValida } from "@/lib/tipos";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
 
@@ -16,6 +17,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
 // PATCH /api/samples/:id — cambia el estatus o cuál es la foto de la prenda. Nunca borra fotos.
 //   { status }           → "comprado" o "solo_foto".
+//   { cantidad }         → número de piezas.
 //   { foto_prenda: url } → foto nueva como portada; la anterior pasa al final de las demás fotos.
 //   { portada: url }     → una foto que ya estaba en la muestra pasa a ser la portada (intercambio).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +26,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const c = await req.json().catch(() => null);
   const sql = await db();
+
+  // { cantidad } — cambia solo la cantidad de piezas.
+  if (c?.cantidad !== undefined) {
+    const filas = (await sql`UPDATE samples SET cantidad = ${cantidadValida(c.cantidad)} WHERE id = ${id} RETURNING *`) as Record<string, unknown>[];
+    if (filas.length === 0) return errorJson("No existe la muestra", 404);
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
 
   // { status: "comprado" | "solo_foto" } — cambia solo el estatus.
   if (c?.status === "comprado" || c?.status === "solo_foto") {

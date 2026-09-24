@@ -10,7 +10,8 @@ import { IconoDescarga } from "./Iconos";
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
-const suma = (lista: Muestra[]) => lista.reduce((t, m) => t + (m.precio_usd ?? 0), 0);
+// Gasto = precio × cantidad de piezas.
+const suma = (lista: Muestra[]) => lista.reduce((t, m) => t + (m.precio_usd ?? 0) * (m.cantidad ?? 1), 0);
 
 export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; keyItems: KeyItem[] }) {
   // Exportar PDF con fotos: qué incluir y avance.
@@ -87,7 +88,9 @@ export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; k
         </div>
         <div className="cifra">
           <div className="valor">{compradas.length}</div>
-          <div className="rotulo">Compradas · {muestras.length - compradas.length} solo foto</div>
+          <div className="rotulo">
+            Compradas ({compradas.reduce((t, m) => t + (m.cantidad ?? 1), 0)} pzas) · {muestras.length - compradas.length} solo foto
+          </div>
         </div>
         <div className="cifra">
           <div className="valor" style={{ fontSize: "1.25rem" }}>{usd.format(valorTodas)}</div>

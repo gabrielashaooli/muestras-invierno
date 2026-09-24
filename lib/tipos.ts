@@ -25,6 +25,7 @@ export interface Muestra {
   tienda: string;
   marca: string;
   precio_usd: number | null;
+  cantidad: number; // piezas
   talla: string;
   color: string;
   tela: string;
@@ -61,4 +62,10 @@ export interface Analisis {
   confianza: string;
   fotoPrenda: number | null; // índice de la foto que muestra la prenda
   fuentes: Fuente[];
+}
+
+// Cantidad válida de piezas (1 a 999); cualquier otra cosa se vuelve 1.
+export function cantidadValida(valor: unknown): number {
+  const n = Math.round(Number(valor));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 999) : 1;
 }

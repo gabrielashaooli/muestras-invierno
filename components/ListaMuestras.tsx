@@ -6,6 +6,7 @@ import { comprimirImagen } from "@/lib/imagen";
 import type { Departamento, Muestra } from "@/lib/tipos";
 import FiltroDept from "./FiltroDept";
 import { IconoBasura, IconoCamara, IconoPrenda } from "./Iconos";
+import Cantidad from "./Cantidad";
 import type { ConSesion } from "./tipos";
 
 interface Props {
@@ -23,6 +24,24 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
   const [analizandoEn, setAnalizandoEn] = useState<number | null>(null);
   // Estatus cambiado en esta pantalla (se ve al instante mientras se guarda).
   const [estatus, setEstatus] = useState<Record<number, Muestra["status"]>>({});
+
+  // Cantidad cambiada en esta pantalla (se ve al instante; se guarda poco después).
+  const [cantidades, setCantidades] = useState<Record<number, number>>({});
+  const temporizadores = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  function cambiarCantidad(m: Muestra, n: number) {
+    setCantidades((c) => ({ ...c, [m.id]: n }));
+    // Espera a que dejen de tocar +/− para guardar una sola vez.
+    clearTimeout(temporizadores.current[m.id]);
+    temporizadores.current[m.id] = setTimeout(async () => {
+      try {
+        await conSesion(() => api(`/api/samples/${m.id}`, { method: "PATCH", body: JSON.stringify({ cantidad: n }) }));
+        await alCambiar();
+      } catch (err) {
+        setError(`No se pudo guardar la cantidad: ${(err as Error).message}`);
+      }
+    }, 700);
+  }
 
   async function cambiarEstatus(m: Muestra, nuevo: Muestra["status"]) {
     const anterior = estatus[m.id] ?? m.status;
@@ -188,7 +207,14 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                   <h3>{m.descripcion || "Sin descripción"}</h3>
                 </div>
                 {m.precio_usd !== null ? (
-                  <span className="precio">{usd.format(m.precio_usd)}</span>
+                  <span className="precio">
+                    {usd.format(m.precio_usd)}
+                    {(cantidades[m.id] ?? m.cantidad ?? 1) > 1 && (
+                      <small className="precio-total">
+                        Total {usd.format(m.precio_usd * (cantidades[m.id] ?? m.cantidad ?? 1))}
+                      </small>
+                    )}
+                  </span>
                 ) : (
                   <span className="precio vacio-precio">Sin precio</span>
                 )}
@@ -205,6 +231,7 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                   ✓ Comprado
                 </button>
               </div>
+              <Cantidad chico valor={cantidades[m.id] ?? m.cantidad ?? 1} alCambiar={(n) => cambiarCantidad(m, n)} />
               <div className="insignias">
                 <span className="insignia">{m.dept}</span>
                 {m.key_item_nombre && <span className="insignia key">{m.key_item_nombre}</span>}

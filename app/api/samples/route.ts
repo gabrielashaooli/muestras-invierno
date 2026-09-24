@@ -3,7 +3,7 @@ import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson, texto } from "@/lib/respuestas";
 import { urlFotoValida } from "@/lib/blob";
 import { parsePrecio } from "@/lib/precio";
-import { esDepartamento, type Fuente } from "@/lib/tipos";
+import { cantidadValida, esDepartamento, type Fuente } from "@/lib/tipos";
 
 // GET /api/samples?dept=Mujer — lista de muestras (más recientes primero).
 export async function GET(req: NextRequest) {
@@ -54,11 +54,11 @@ export async function POST(req: NextRequest) {
   const sql = await db();
   const [fila] = (await sql`
     INSERT INTO samples (
-      dept, status, descripcion, key_item_id, tienda, marca, precio_usd,
+      dept, status, descripcion, key_item_id, tienda, marca, precio_usd, cantidad,
       talla, color, tela, codigo, estilo, notas, fuentes, fotos, fotos_prenda
     ) VALUES (
       ${c.dept}, ${status}, ${texto(c.descripcion)}, ${keyItemId}, ${texto(c.tienda, 200)},
-      ${texto(c.marca, 200)}, ${precio}, ${texto(c.talla, 100)}, ${texto(c.color, 100)},
+      ${texto(c.marca, 200)}, ${precio}, ${cantidadValida(c.cantidad)}, ${texto(c.talla, 100)}, ${texto(c.color, 100)},
       ${texto(c.tela, 300)}, ${texto(c.codigo, 100)}, ${texto(c.estilo, 100)},
       ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb
     )

@@ -15,6 +15,7 @@ import {
   type Fuente,
   type KeyItem,
 } from "@/lib/tipos";
+import Cantidad from "./Cantidad";
 import type { ConSesion } from "./tipos";
 
 interface Campos {
@@ -79,6 +80,7 @@ interface Props {
 export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   const [dept, setDept] = useState<Departamento>("Mujer");
   const [status, setStatus] = useState<Estatus>("solo_foto");
+  const [cantidad, setCantidad] = useState(1);
   const [campos, setCampos] = useState<Campos>(VACIO);
   const [fotos, setFotos] = useState<Foto[]>([]); // etiquetas: se analizan con Claude
   const [portadaId, setPortadaId] = useState<string | null>(null); // foto de la prenda (referencia)
@@ -294,6 +296,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     setAnalizado(false);
     setSugerenciaDept(null);
     setStatus("solo_foto");
+    setCantidad(1);
     setCampos((c) => ({ ...VACIO, tienda: c.tienda })); // la tienda se conserva
   }
 
@@ -314,6 +317,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
             ...campos,
             dept,
             status,
+            cantidad,
             key_item_id: campos.key_item_id ? Number(campos.key_item_id) : null,
             precio_usd: precio,
             // La foto de la prenda se guarda aparte como referencia; las demás son etiquetas.
@@ -520,6 +524,11 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
         <div className="fila">
           {campo("codigo", "Código de barras", { inputMode: "numeric" })}
           {campo("estilo", "Estilo")}
+        </div>
+
+        <div className="campo">
+          <label>Cantidad</label>
+          <Cantidad valor={cantidad} alCambiar={setCantidad} />
         </div>
 
         <div className="segmentos estatus" role="group" aria-label="Estatus">
