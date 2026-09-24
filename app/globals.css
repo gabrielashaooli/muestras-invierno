@@ -1200,3 +1200,35 @@ details summary {
   background: none;
   color: var(--texto-suave);
 }
+
+/* Selector de estatus en la tarjeta de la muestra */
+.mini-estatus {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--superficie-2);
+}
+
+.mini-estatus button {
+  border: 0;
+  background: none;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+.mini-estatus button[aria-pressed="true"] {
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.mini-estatus button.comprado[aria-pressed="true"] {
+  background: var(--exito);
+  color: #fff;
+}

@@ -14,7 +14,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json({ ok: true });
 }
 
-// PATCH /api/samples/:id — cambia cuál es la foto de la prenda (portada). Nunca borra fotos.
+// PATCH /api/samples/:id — cambia el estatus o cuál es la foto de la prenda. Nunca borra fotos.
+//   { status }           → "comprado" o "solo_foto".
 //   { foto_prenda: url } → foto nueva como portada; la anterior pasa al final de las demás fotos.
 //   { portada: url }     → una foto que ya estaba en la muestra pasa a ser la portada (intercambio).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +24,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const c = await req.json().catch(() => null);
   const sql = await db();
+
+  // { status: "comprado" | "solo_foto" } — cambia solo el estatus.
+  if (c?.status === "comprado" || c?.status === "solo_foto") {
+    const filas = (await sql`UPDATE samples SET status = ${c.status} WHERE id = ${id} RETURNING *`) as Record<string, unknown>[];
+    if (filas.length === 0) return errorJson("No existe la muestra", 404);
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
+
   const [actual] = (await sql`SELECT fotos, fotos_prenda FROM samples WHERE id = ${id}`) as {
     fotos: string[];
     fotos_prenda: string[];

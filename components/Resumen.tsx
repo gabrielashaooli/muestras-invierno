@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { guardarLocal, leerLocal, TIPO_CAMBIO_INICIAL } from "@/lib/local";
 import { parsePrecio } from "@/lib/precio";
-import { DEPARTAMENTOS, type KeyItem, type Muestra } from "@/lib/tipos";
+import { compartirArchivo, generarPdfMuestras } from "@/lib/pdfMuestras";
+import { DEPARTAMENTOS, type Departamento, type KeyItem, type Muestra } from "@/lib/tipos";
 import { IconoDescarga } from "./Iconos";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -12,6 +13,31 @@ const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" 
 const suma = (lista: Muestra[]) => lista.reduce((t, m) => t + (m.precio_usd ?? 0), 0);
 
 export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; keyItems: KeyItem[] }) {
+  // Exportar PDF con fotos: qué incluir y avance.
+  const [soloCompradas, setSoloCompradas] = useState(false);
+  const [deptPdf, setDeptPdf] = useState<Departamento | "">("");
+  const [avance, setAvance] = useState<string>("");
+  const [errorPdf, setErrorPdf] = useState("");
+
+  const paraPdf = muestras
+    .filter((m) => (!soloCompradas || m.status === "comprado") && (!deptPdf || m.dept === deptPdf))
+    .sort((a, b) => a.dept.localeCompare(b.dept) || a.creado_en.localeCompare(b.creado_en));
+
+  async function descargarPdf() {
+    setErrorPdf("");
+    setAvance("Preparando…");
+    try {
+      const titulo = ["Muestras Invierno", deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
+      const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`));
+      const fecha = new Date().toISOString().slice(0, 10);
+      await compartirArchivo(blob, `muestras-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}-${fecha}.pdf`.toLowerCase());
+    } catch (e) {
+      setErrorPdf(`No se pudo crear el PDF: ${(e as Error).message}`);
+    } finally {
+      setAvance("");
+    }
+  }
+
   // Tipo de cambio editable; se recuerda en este dispositivo. Acepta "18.5" o "18,5".
   const [tipoCambio, setTipoCambio] = useState(String(TIPO_CAMBIO_INICIAL));
 
@@ -115,8 +141,30 @@ export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; k
         ))}
       </section>
 
-      <a className="boton primario ancho" href="/api/export" download>
-        <IconoDescarga /> Descargar CSV
+      <section className="tarjeta">
+        <h2>Exportar con fotos (PDF)</h2>
+        <div className="segmentos" role="group" aria-label="Departamento del PDF">
+          <button aria-pressed={deptPdf === ""} onClick={() => setDeptPdf("")}>Todos</button>
+          {DEPARTAMENTOS.map((d) => (
+            <button key={d} aria-pressed={deptPdf === d} onClick={() => setDeptPdf(d)}>{d}</button>
+          ))}
+        </div>
+        <div className="segmentos" role="group" aria-label="Qué muestras incluir">
+          <button aria-pressed={!soloCompradas} onClick={() => setSoloCompradas(false)}>Todas</button>
+          <button aria-pressed={soloCompradas} onClick={() => setSoloCompradas(true)}>Solo compradas</button>
+        </div>
+        <button className="boton primario ancho" onClick={descargarPdf} disabled={Boolean(avance) || paraPdf.length === 0}>
+          {avance ? (
+            <><span className="girando" /> {avance}</>
+          ) : (
+            <><IconoDescarga /> Descargar PDF ({paraPdf.length} {paraPdf.length === 1 ? "muestra" : "muestras"})</>
+          )}
+        </button>
+        {errorPdf && <div className="estado error">{errorPdf}</div>}
+      </section>
+
+      <a className="boton ancho" href="/api/export" download>
+        <IconoDescarga /> Descargar tabla (CSV para Excel)
       </a>
     </>
   );

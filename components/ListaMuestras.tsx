@@ -21,6 +21,21 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
   const [borrando, setBorrando] = useState<number | null>(null);
   const [menu, setMenu] = useState<Muestra | null>(null); // menú ⋯ abierto
   const [analizandoEn, setAnalizandoEn] = useState<number | null>(null);
+  // Estatus cambiado en esta pantalla (se ve al instante mientras se guarda).
+  const [estatus, setEstatus] = useState<Record<number, Muestra["status"]>>({});
+
+  async function cambiarEstatus(m: Muestra, nuevo: Muestra["status"]) {
+    const anterior = estatus[m.id] ?? m.status;
+    if (anterior === nuevo) return;
+    setEstatus((e) => ({ ...e, [m.id]: nuevo }));
+    try {
+      await conSesion(() => api(`/api/samples/${m.id}`, { method: "PATCH", body: JSON.stringify({ status: nuevo }) }));
+      await alCambiar();
+    } catch (err) {
+      setEstatus((e) => ({ ...e, [m.id]: anterior }));
+      setError(`No se pudo cambiar: ${(err as Error).message}`);
+    }
+  }
 
   // Vuelve a analizar con Claude las fotos guardadas; solo llena lo que está vacío.
   async function analizarMuestra(m: Muestra) {
@@ -178,10 +193,19 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
                   <span className="precio vacio-precio">Sin precio</span>
                 )}
               </div>
+              <div className="mini-estatus" role="group" aria-label="Estatus">
+                <button aria-pressed={(estatus[m.id] ?? m.status) === "solo_foto"} onClick={() => cambiarEstatus(m, "solo_foto")}>
+                  Solo foto
+                </button>
+                <button
+                  className="comprado"
+                  aria-pressed={(estatus[m.id] ?? m.status) === "comprado"}
+                  onClick={() => cambiarEstatus(m, "comprado")}
+                >
+                  ✓ Comprado
+                </button>
+              </div>
               <div className="insignias">
-                <span className={`insignia${m.status === "comprado" ? " comprado" : ""}`}>
-                  {m.status === "comprado" ? "Comprado" : "Solo foto"}
-                </span>
                 <span className="insignia">{m.dept}</span>
                 {m.key_item_nombre && <span className="insignia key">{m.key_item_nombre}</span>}
               </div>
