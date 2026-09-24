@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { urlFotoValida } from "@/lib/blob";
-import { cantidadValida } from "@/lib/tipos";
-import { db, normalizarMuestra } from "@/lib/db";
-import { errorJson } from "@/lib/respuestas";
+import { parsePrecio } from "@/lib/precio";
+import { cantidadValida, esDepartamento } from "@/lib/tipos";
+import { copiaDeDatos, db, normalizarMuestra } from "@/lib/db";
+import { errorJson, texto } from "@/lib/respuestas";
 
 // DELETE /api/samples/:id — solo oculta la muestra (borrado suave). No se borran datos ni fotos.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +27,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const c = await req.json().catch(() => null);
   const sql = await db();
+
+  // { editar: {...} } — corrección a mano de los datos; lo anterior queda en "respaldo".
+  if (c?.editar && typeof c.editar === "object") {
+    const e = c.editar;
+    const [m] = (await sql`SELECT * FROM samples WHERE id = ${id}`) as Record<string, unknown>[];
+    if (!m) return errorJson("No existe la muestra", 404);
+    if (!esDepartamento(e.dept)) return errorJson("Departamento inválido");
+    const vacio = e.precio_usd === "" || e.precio_usd === null || e.precio_usd === undefined;
+    const precio = vacio ? null : parsePrecio(e.precio_usd);
+    if (!vacio && precio === null) return errorJson("Precio inválido: escribe solo el número, ej. 29.99");
+    const keyItemId = Number(e.key_item_id) > 0 ? Number(e.key_item_id) : null;
+    const respaldo = [...((m.respaldo as unknown[]) ?? []), copiaDeDatos(m)].slice(-10);
+    const filas = (await sql`
+      UPDATE samples SET
+        dept = ${e.dept}, descripcion = ${texto(e.descripcion)}, key_item_id = ${keyItemId},
+        tienda = ${texto(e.tienda, 200)}, marca = ${texto(e.marca, 200)}, precio_usd = ${precio},
+        talla = ${texto(e.talla, 100)}, color = ${texto(e.color, 100)}, tela = ${texto(e.tela, 300)},
+        codigo = ${texto(e.codigo, 100)}, estilo = ${texto(e.estilo, 100)}, notas = ${texto(e.notas, 2000)},
+        respaldo = ${JSON.stringify(respaldo)}::jsonb
+      WHERE id = ${id}
+      RETURNING *`) as Record<string, unknown>[];
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
 
   // { cantidad } — cambia solo la cantidad de piezas.
   if (c?.cantidad !== undefined) {

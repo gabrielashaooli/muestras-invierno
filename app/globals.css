@@ -1289,3 +1289,43 @@ details summary {
   color: var(--texto-suave);
   text-align: right;
 }
+
+/* Hoja de edición: más alta y con scroll */
+.hoja.hoja-editar {
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: 12px 16px calc(var(--seguro-abajo) + 16px);
+  gap: 0;
+}
+
+.hoja.hoja-editar button {
+  width: auto;
+  min-height: 48px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.hoja.hoja-editar .segmentos button {
+  min-height: 40px;
+  flex: 1 0 auto;
+  background: transparent;
+}
+
+.hoja.hoja-editar .segmentos button[aria-pressed="true"] {
+  background: var(--superficie);
+}
+
+.hoja.hoja-editar .boton.primario {
+  background: linear-gradient(135deg, var(--primario-2), var(--primario));
+  color: var(--primario-texto);
+}
+
+.hoja.hoja-editar > * {
+  flex-shrink: 0;
+}
+
+.hoja.hoja-editar .segmentos button {
+  width: auto;
+  padding: 8px 12px;
+}

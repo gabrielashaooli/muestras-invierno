@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
 import { analizarImagenes, ErrorAnalisis, MAX_IMAGENES, TIPOS_IMAGEN, type Imagen, type TipoImagen } from "@/lib/analisis";
 import { PREFIJO_FOTO_BD } from "@/lib/blob";
-import { db, normalizarMuestra } from "@/lib/db";
+import { copiaDeDatos, db, normalizarMuestra } from "@/lib/db";
 import { parsePrecio } from "@/lib/precio";
 import { errorJson } from "@/lib/respuestas";
 import { esDepartamento, type Fuente } from "@/lib/tipos";
 
 export const maxDuration = 120; // la búsqueda web puede tardar
 
-// POST /api/samples/:id/analizar — analiza con Claude las fotos ya guardadas de una muestra
-// y llena SOLO los campos que están vacíos. No borra ni sobrescribe nada.
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// POST /api/samples/:id/analizar — analiza con Claude las fotos ya guardadas de una muestra.
+//   { modo: "llenar" } (por defecto) → llena SOLO los campos vacíos.
+//   { modo: "reemplazar" }           → vuelve a revisar desde cero y reemplaza los datos de la prenda
+//                                       (tienda, estatus y cantidad no se tocan; el precio solo si Claude lo leyó).
+//   En modo reemplazar, los datos anteriores se guardan en "respaldo".
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) return errorJson("Id inválido");
+  const cuerpo = await req.json().catch(() => ({}));
+  const reemplazar = cuerpo?.modo === "reemplazar";
 
   const sql = await db();
   const [m] = (await sql`SELECT * FROM samples WHERE id = ${id}`) as Record<string, unknown>[];
@@ -52,14 +57,36 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     throw e;
   }
 
-  // Solo se llenan los vacíos.
   const vacio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
-  const elegir = (actual: unknown, nuevo: string) => (vacio(actual) ? nuevo : String(actual));
-  const fuentes = new Map<string, Fuente>(((m.fuentes as Fuente[]) ?? []).map((f) => [f.url, f]));
+  const fuentes = new Map<string, Fuente>(reemplazar ? [] : ((m.fuentes as Fuente[]) ?? []).map((f) => [f.url, f]));
   for (const f of r.fuentes) if (!fuentes.has(f.url)) fuentes.set(f.url, f);
 
-  const filas = (await sql`
-    UPDATE samples SET
+  if (reemplazar) {
+    const precio = parsePrecio(r.precio);
+    const respaldo = [...((m.respaldo as unknown[]) ?? []), copiaDeDatos(m)].slice(-10);
+    const filas = (await sql`
+      UPDATE samples SET
+        descripcion = ${r.desc},
+        marca = ${r.marca},
+        precio_usd = ${precio ?? (vacio(m.precio_usd) ? null : Number(m.precio_usd))},
+        talla = ${r.talla},
+        color = ${r.color},
+        tela = ${r.tela},
+        codigo = ${r.codigo},
+        estilo = ${r.estilo},
+        key_item_id = ${r.keyItemId ?? (vacio(m.key_item_id) ? null : Number(m.key_item_id))},
+        notas = ${r.notas},
+        fuentes = ${JSON.stringify([...fuentes.values()])}::jsonb,
+        respaldo = ${JSON.stringify(respaldo)}::jsonb
+      WHERE id = ${id}
+      RETURNING *`) as Record<string, unknown>[];
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
+
+  // Solo se llenan los vacíos.
+  const elegir = (actual: unknown, nuevo: string) => (vacio(actual) ? nuevo : String(actual));
+
+  const filas = (await sql`    UPDATE samples SET
       descripcion = ${elegir(m.descripcion, r.desc)},
       marca = ${elegir(m.marca, r.marca)},
       precio_usd = ${vacio(m.precio_usd) ? parsePrecio(r.precio) : Number(m.precio_usd)},

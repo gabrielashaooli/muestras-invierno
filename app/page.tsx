@@ -84,7 +84,7 @@ export default function Inicio() {
           <Capturar keyItems={keyItems} conSesion={conSesion} alGuardar={recargar} />
         )}
         {pestana === "muestras" && (
-          <ListaMuestras muestras={muestras} conSesion={conSesion} alCambiar={recargar} />
+          <ListaMuestras muestras={muestras} keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
         )}
         {pestana === "keyitems" && (
           <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />

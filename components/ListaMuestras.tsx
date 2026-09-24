@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { comprimirImagen } from "@/lib/imagen";
-import type { Departamento, Muestra } from "@/lib/tipos";
+import type { Departamento, KeyItem, Muestra } from "@/lib/tipos";
+import EditarMuestra from "./EditarMuestra";
 import FiltroDept from "./FiltroDept";
 import { IconoBasura, IconoCamara, IconoPrenda } from "./Iconos";
 import Cantidad from "./Cantidad";
@@ -11,13 +12,14 @@ import type { ConSesion } from "./tipos";
 
 interface Props {
   muestras: Muestra[];
+  keyItems: KeyItem[];
   conSesion: ConSesion;
   alCambiar: () => Promise<void>;
 }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props) {
+export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar }: Props) {
   const [filtro, setFiltro] = useState<Departamento | "">("");
   const [borrando, setBorrando] = useState<number | null>(null);
   const [menu, setMenu] = useState<Muestra | null>(null); // menú ⋯ abierto
@@ -56,12 +58,17 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
     }
   }
 
-  // Vuelve a analizar con Claude las fotos guardadas; solo llena lo que está vacío.
-  async function analizarMuestra(m: Muestra) {
+  const [editando, setEditando] = useState<Muestra | null>(null);
+
+  // Vuelve a analizar con Claude las fotos guardadas.
+  // "llenar": solo lo vacío. "reemplazar": revisa desde cero (lo anterior queda respaldado).
+  async function analizarMuestra(m: Muestra, modo: "llenar" | "reemplazar" = "llenar") {
     setAnalizandoEn(m.id);
     setError("");
     try {
-      await conSesion(() => api(`/api/samples/${m.id}/analizar`, { method: "POST" }));
+      await conSesion(() =>
+        api(`/api/samples/${m.id}/analizar`, { method: "POST", body: JSON.stringify({ modo }) }),
+      );
       await alCambiar();
     } catch (e) {
       setError(`No se pudo analizar: ${(e as Error).message}`);
@@ -275,6 +282,30 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
             </button>
             <button
               role="menuitem"
+              disabled={analizandoEn !== null || [...menu.fotos, ...(menu.fotos_prenda ?? [])].length === 0}
+              onClick={() => {
+                const m = menu;
+                setMenu(null);
+                if (confirm("¿Volver a revisar esta prenda desde cero? Claude reemplaza los datos; los anteriores quedan respaldados.")) {
+                  analizarMuestra(m, "reemplazar");
+                }
+              }}
+            >
+              Volver a revisar desde cero
+              <small>Si los datos se confundieron con otra prenda</small>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setEditando(menu);
+                setMenu(null);
+              }}
+            >
+              Editar datos
+              <small>Corregir a mano</small>
+            </button>
+            <button
+              role="menuitem"
               onClick={() => {
                 const m = menu;
                 setMenu(null);
@@ -309,6 +340,16 @@ export default function ListaMuestras({ muestras, conSesion, alCambiar }: Props)
             <button className="cancelar" onClick={() => setMenu(null)}>Cancelar</button>
           </div>
         </div>
+      )}
+
+      {editando && (
+        <EditarMuestra
+          muestra={editando}
+          keyItems={keyItems}
+          conSesion={conSesion}
+          alCerrar={() => setEditando(null)}
+          alGuardar={alCambiar}
+        />
       )}
 
       {visor && (

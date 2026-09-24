@@ -97,6 +97,8 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   const entradaFoto = useRef<HTMLInputElement>(null);
   const entradaGaleria = useRef<HTMLInputElement>(null);
   const camposRef = useRef(campos);
+  // Cambia cada vez que se limpia/guarda: un análisis que llegue tarde ya no se mete en la prenda siguiente.
+  const generacion = useRef(0);
   camposRef.current = campos;
 
   // Recordar departamento y tienda entre capturas.
@@ -175,6 +177,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
 
   // Llama a Claude y llena SOLO los campos que siguen vacíos.
   async function analizar(todas: Foto[]) {
+    const gen = generacion.current;
     setAnalizando(true);
     setMensaje({ tipo: "", texto: "" });
     try {
@@ -184,7 +187,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
           body: JSON.stringify({ dept, imagenes: todas.slice(-MAX_FOTOS_ANALISIS).map((f) => f.base64) }),
         }),
       );
-      if (!r) return;
+      if (!r || gen !== generacion.current) return; // la captura ya cambió: se descarta
 
       // Claude indica cuál foto muestra la prenda; se usa como foto de referencia.
       const enviadas = todas.slice(-MAX_FOTOS_ANALISIS);
@@ -221,7 +224,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       });
 
     } catch (e) {
-      setMensaje({ tipo: "error", texto: `No se pudo analizar: ${(e as Error).message}` });
+      if (gen === generacion.current) setMensaje({ tipo: "error", texto: `No se pudo analizar: ${(e as Error).message}` });
     } finally {
       setAnalizando(false);
     }
@@ -287,6 +290,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
   }
 
   function limpiar() {
+    generacion.current++;
     fotos.forEach((f) => URL.revokeObjectURL(f.previa));
     setFotos([]);
     setPortadaId(null);
