@@ -4,30 +4,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, NoAutorizado } from "@/lib/api";
 import { guardarLocal, leerLocal } from "@/lib/local";
 import type { Coleccion, KeyItem, Muestra } from "@/lib/tipos";
-import Capturar from "@/components/Capturar";
-import ListaMuestras from "@/components/ListaMuestras";
-import KeyItems from "@/components/KeyItems";
-import Resumen from "@/components/Resumen";
 import Acceso from "@/components/Acceso";
-import { IconoCamara, IconoGrafica, IconoLista, IconoPrenda } from "@/components/Iconos";
+import Capturar from "@/components/Capturar";
+import Colecciones from "@/components/Colecciones";
+import KeyItems from "@/components/KeyItems";
+import ListaMuestras from "@/components/ListaMuestras";
+import Resumen from "@/components/Resumen";
+import SubirTicket from "@/components/SubirTicket";
 
-type Pestana = "capturar" | "muestras" | "keyitems" | "resumen";
-
-const PESTANAS: { id: Pestana; titulo: string; icono: React.ReactNode }[] = [
-  { id: "capturar", titulo: "Capturar", icono: <IconoCamara /> },
-  { id: "muestras", titulo: "Muestras", icono: <IconoPrenda /> },
-  { id: "keyitems", titulo: "Key items", icono: <IconoLista /> },
-  { id: "resumen", titulo: "Resumen", icono: <IconoGrafica /> },
-];
+// Navegación simple: Inicio (colecciones) → Colección (tiendas y muestras) → Agregar / Resumen / Key items.
+type Vista = "inicio" | "coleccion" | "agregar" | "resumen" | "keyitems";
 
 export default function Inicio() {
   const [sesion, setSesion] = useState<"cargando" | "ok" | "pendiente">("cargando");
-  const [pestana, setPestana] = useState<Pestana>("capturar");
+  const [vista, setVista] = useState<Vista>("inicio");
   const [muestras, setMuestras] = useState<Muestra[]>([]);
   const [keyItems, setKeyItems] = useState<KeyItem[]>([]);
   const [colecciones, setColecciones] = useState<Coleccion[]>([]);
   const [activa, setActiva] = useState<number | null>(null);
-  const [elegirColeccion, setElegirColeccion] = useState(false);
+  const [ticket, setTicket] = useState(false);
   const [error, setError] = useState("");
 
   // Envuelve una llamada a la API y regresa a la pantalla de acceso si expiró la sesión.
@@ -58,47 +53,53 @@ export default function Inicio() {
     }
   }, [conSesion]);
 
-  // Colección activa: la última que se usó en este teléfono, o la más reciente.
+  // Al abrir: si ya había una colección abierta en este teléfono, se regresa a ella.
+  const restaurada = useRef(false);
   useEffect(() => {
-    if (!colecciones.length) return;
-    if (activa !== null && colecciones.some((c) => c.id === activa)) return;
+    if (restaurada.current || !colecciones.length) return;
+    restaurada.current = true;
     const guardada = Number(leerLocal("coleccion"));
-    setActiva(colecciones.some((c) => c.id === guardada) ? guardada : colecciones[0].id);
-  }, [colecciones, activa]);
+    if (colecciones.some((c) => c.id === guardada)) {
+      setActiva(guardada);
+      setVista("coleccion");
+    }
+  }, [colecciones]);
 
-  function cambiarColeccion(id: number) {
+  function abrirColeccion(id: number) {
     setActiva(id);
     guardarLocal("coleccion", String(id));
+    setVista("coleccion");
   }
 
-  // Muestras creadas desde un ticket que aún no se completan: la app las arregla sola
-  // (descripción clara, datos y foto), una por una, sin que la persona tenga que tocar nada.
+  function irAInicio() {
+    guardarLocal("coleccion", "");
+    setVista("inicio");
+  }
+
+  // Completa sola, en segundo plano, lo que falta (una vez por muestra y por sesión; nunca toca fotos):
+  // 1) creadas desde ticket: descripción clara, datos y foto; 2) con fotos pero sin descripción o código.
   const [completando, setCompletando] = useState("");
   const enProceso = useRef(false);
-  const intentadas = useRef(new Set<number>()); // cada muestra se intenta una sola vez por sesión
+  const intentadas = useRef(new Set<number>());
   useEffect(() => {
-    // 1) Creadas desde ticket: descripción clara, datos y foto.
-    // 2) Con fotos pero sin descripción o sin código: Claude lee su etiqueta (así el ticket las reconoce).
-    //    Solo se llenan campos vacíos; las fotos no se tocan.
     const pendientes = muestras.filter(
       (m) =>
         !m.auto_revisado &&
         !intentadas.current.has(m.id) &&
         (m.origen === "ticket" ||
-          ((m.fotos.length + (m.fotos_prenda?.length ?? 0)) > 0 && (!m.descripcion?.trim() || !m.codigo?.trim()))),
+          (m.fotos.length + (m.fotos_prenda?.length ?? 0) > 0 && (!m.descripcion?.trim() || !m.codigo?.trim()))),
     );
     if (enProceso.current || pendientes.length === 0) return;
     enProceso.current = true;
     (async () => {
       for (let i = 0; i < pendientes.length; i++) {
-        setCompletando(`Completando datos que faltan ${i + 1} de ${pendientes.length}…`);
+        setCompletando(`Completando datos ${i + 1} de ${pendientes.length}…`);
         const m = pendientes[i];
         intentadas.current.add(m.id);
         try {
           if (m.origen === "ticket") await api(`/api/samples/${m.id}/completar`, { method: "POST" });
           else await api(`/api/samples/${m.id}/analizar`, { method: "POST", body: JSON.stringify({ modo: "llenar" }) });
         } catch (e) {
-          console.error("No se pudo completar", m.id, e);
           if (e instanceof NoAutorizado) break;
         }
       }
@@ -124,92 +125,70 @@ export default function Inicio() {
   const coleccion = colecciones.find((c) => c.id === activa);
   const deLaColeccion = muestras.filter((m) => m.coleccion_id === activa);
 
+  // Barra superior de cada pantalla.
+  const barra = (titulo: string, atras?: { texto: string; ir: () => void }) => (
+    <header className="barra">
+      {atras ? (
+        <button className="barra-atras" onClick={atras.ir}>‹ {atras.texto}</button>
+      ) : (
+        <span />
+      )}
+      <h1>{titulo}</h1>
+    </header>
+  );
+
   return (
-    <>
-      <main className="app">
-        <header className="encabezado">
-          <div style={{ minWidth: 0 }}>
-            <button className="selector-coleccion" onClick={() => setElegirColeccion(true)}>
-              {coleccion?.nombre ?? "Muestras"} <span aria-hidden>▾</span>
-            </button>
-            <h1>{PESTANAS.find((p) => p.id === pestana)?.titulo}</h1>
-          </div>
-          <span className="pastilla">
-            {deLaColeccion.length} {deLaColeccion.length === 1 ? "muestra" : "muestras"}
-          </span>
-        </header>
+    <main className="app">
+      {vista === "inicio" && (
+        <>
+          {barra("Muestras")}
+          <Colecciones colecciones={colecciones} alElegir={abrirColeccion} conSesion={conSesion} alCambiar={recargar} />
+        </>
+      )}
 
-        {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
-        {completando && (
-          <div className="estado" style={{ marginTop: 0, marginBottom: 12 }}>
-            <span className="girando" /> {completando}
+      {vista === "coleccion" && coleccion && (
+        <>
+          {barra(coleccion.nombre, { texto: "Colecciones", ir: irAInicio })}
+          <div className="acciones-coleccion">
+            <button className="boton primario ancho" onClick={() => setVista("agregar")}>+ Agregar muestra</button>
+            <div className="acciones-secundarias">
+              <button className="boton" onClick={() => setTicket(true)}>Ticket</button>
+              <button className="boton" onClick={() => setVista("resumen")}>Resumen</button>
+              <button className="boton" onClick={() => setVista("keyitems")}>Key items</button>
+            </div>
           </div>
-        )}
+        </>
+      )}
 
-        {pestana === "capturar" && (
-          <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} />
-        )}
-        {pestana === "muestras" && (
-          <ListaMuestras
-            muestras={deLaColeccion}
-            colecciones={colecciones}
-            activa={activa}
-            alElegirColeccion={cambiarColeccion}
-            keyItems={keyItems}
-            conSesion={conSesion}
-            alCambiar={recargar}
-          />
-        )}
-        {pestana === "keyitems" && (
-          <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
-        )}
-        {pestana === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} />}
-      </main>
+      {vista === "agregar" && barra("Nueva muestra", { texto: coleccion?.nombre ?? "Atrás", ir: () => setVista("coleccion") })}
+      {vista === "resumen" && barra("Resumen", { texto: coleccion?.nombre ?? "Atrás", ir: () => setVista("coleccion") })}
+      {vista === "keyitems" && barra("Key items", { texto: coleccion?.nombre ?? "Atrás", ir: () => setVista("coleccion") })}
 
-      {elegirColeccion && (
-        <div className="hoja-fondo" onClick={() => setElegirColeccion(false)}>
-          <div className="hoja" role="menu" onClick={(e) => e.stopPropagation()}>
-            <p className="hoja-titulo">Colección</p>
-            {colecciones.map((c) => (
-              <button
-                key={c.id}
-                role="menuitem"
-                className={c.id === activa ? "elegida" : ""}
-                onClick={() => {
-                  cambiarColeccion(c.id);
-                  setElegirColeccion(false);
-                }}
-              >
-                {c.nombre}
-                <small>{c.muestras} muestras · {c.tiendas} tiendas</small>
-              </button>
-            ))}
-            <button
-              role="menuitem"
-              onClick={() => {
-                setElegirColeccion(false);
-                setPestana("muestras");
-              }}
-            >
-              Ver todas / nueva colección
-            </button>
-          </div>
+      {error && <div className="aviso error">{error}</div>}
+      {completando && (
+        <div className="aviso">
+          <span className="girando" /> {completando}
         </div>
       )}
 
-      <nav className="pestanas" role="tablist">
-        {PESTANAS.map((p) => (
-          <button
-            key={p.id}
-            role="tab"
-            aria-selected={pestana === p.id}
-            onClick={() => setPestana(p.id)}
-          >
-            {p.icono}
-            {p.titulo}
-          </button>
-        ))}
-      </nav>
-    </>
+      {vista === "coleccion" && coleccion && (
+        <ListaMuestras muestras={deLaColeccion} keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
+      )}
+      {vista === "agregar" && (
+        <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} />
+      )}
+      {vista === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} />}
+      {vista === "keyitems" && <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />}
+
+      {ticket && (
+        <SubirTicket
+          muestras={deLaColeccion}
+          coleccionId={activa}
+          conSesion={conSesion}
+          alCerrar={() => setTicket(false)}
+          alCambiar={recargar}
+        />
+      )}
+    </main>
   );
 }

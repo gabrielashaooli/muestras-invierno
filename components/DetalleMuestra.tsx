@@ -36,6 +36,7 @@ export default function DetalleMuestra({
   alError: (mensaje: string) => void;
 }) {
   const [cantidad, setCantidad] = useState(m.cantidad ?? 1);
+  const [mas, setMas] = useState(false);
   const temporizador = useRef<ReturnType<typeof setTimeout>>(undefined);
   const prendas = m.fotos_prenda ?? [];
   const todas = [...prendas, ...m.fotos];
@@ -83,23 +84,32 @@ export default function DetalleMuestra({
           <button className="visor-cerrar en-hoja" aria-label="Cerrar" onClick={alCerrar}>×</button>
         </div>
 
-        {/* Fotos */}
-        <div className="detalle-fotos">
-          {todas.map((f, i) => (
-            <button key={f} className="detalle-foto" onClick={() => alVerFotos({ id: m.id, fotos: todas, i, prenda: prendas[0] })}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={f} alt="" loading="lazy" />
-              <span>{i < prendas.length ? "Prenda" : "Etiqueta"}</span>
-            </button>
-          ))}
-          <button className="detalle-foto agregar" onClick={alAgregarFoto} disabled={Boolean(ocupado)}>
-            <span className="mas">+</span>
-            {prendas.length ? "Otra foto" : "Foto prenda"}
+        {/* Foto grande + miniaturas */}
+        {todas[0] ? (
+          <button className="foto-grande" onClick={() => alVerFotos({ id: m.id, fotos: todas, i: 0, prenda: prendas[0] })}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={todas[0]} alt="" />
           </button>
-        </div>
+        ) : (
+          <button className="foto-grande vacia" onClick={alAgregarFoto} disabled={Boolean(ocupado)}>
+            + Agregar foto de la prenda
+          </button>
+        )}
+        {todas.length > 0 && (
+          <div className="miniaturas-detalle">
+            {todas.slice(1).map((f, j) => (
+              <button key={f} onClick={() => alVerFotos({ id: m.id, fotos: todas, i: j + 1, prenda: prendas[0] })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f} alt="" loading="lazy" />
+                <span>{j + 1 < prendas.length ? "Prenda" : "Etiqueta"}</span>
+              </button>
+            ))}
+            <button className="agregar" onClick={alAgregarFoto} disabled={Boolean(ocupado)} aria-label="Agregar foto">+</button>
+          </div>
+        )}
 
         {ocupado && (
-          <div className="estado" style={{ marginTop: 0, marginBottom: 12 }}>
+          <div className="aviso">
             <span className="girando" /> {ocupado}
           </div>
         )}
@@ -109,10 +119,10 @@ export default function DetalleMuestra({
           <div>
             <div className="detalle-precio">{m.precio_usd !== null ? usd.format(m.precio_usd) : "Sin precio"}</div>
             {m.precio_usd !== null && cantidad > 1 && (
-              <div className="pequeno">Total {usd.format(m.precio_usd * cantidad)}</div>
+              <div className="texto-suave">Total {usd.format(m.precio_usd * cantidad)}</div>
             )}
           </div>
-          <Cantidad chico valor={cantidad} alCambiar={cambiarCantidad} />
+          <Cantidad valor={cantidad} alCambiar={cambiarCantidad} />
         </div>
         <div className="segmentos estatus" role="group" aria-label="Estatus">
           <button aria-pressed={m.status === "solo_foto"} onClick={() => accion("", patch({ status: "solo_foto" }), "No se pudo cambiar")}>
@@ -140,9 +150,13 @@ export default function DetalleMuestra({
         </dl>
         {m.notas && <p className="detalle-notas">{m.notas}</p>}
 
-        {/* Acciones */}
+        {/* Acciones: Editar y Más */}
+        <div className="botones-detalle">
+          <button className="boton primario" onClick={alEditar}>Editar</button>
+          <button className="boton" onClick={() => setMas(!mas)}>{mas ? "Menos" : "Más"}</button>
+        </div>
+        {mas && (
         <div className="detalle-acciones">
-          <button onClick={alEditar}>Editar datos</button>
           {prendas.length === 0 && (
             <button
               disabled={Boolean(ocupado)}
@@ -190,6 +204,8 @@ export default function DetalleMuestra({
             <IconoBasura tam={16} /> Quitar de la lista
           </button>
         </div>
+
+        )}
 
         {(m.fuentes ?? []).length > 0 && (
           <details className="detalle-fuentes">

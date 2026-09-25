@@ -429,13 +429,11 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
           <button className="boton-foto" disabled={Boolean(procesando)} onClick={() => abrirCamara("etiqueta")}>
             <span className="circulo"><IconoCamara tam={28} /></span>
             1. Foto de la etiqueta
-            <small>Después sigue la foto de la prenda</small>
           </button>
         ) : !fotoPrenda ? (
           <button className="boton-foto" onClick={() => abrirCamara("prenda")}>
             <span className="circulo"><IconoCamara tam={28} /></span>
             2. Foto de la prenda
-            <small>Para verla como portada</small>
           </button>
         ) : (
           <button className="boton ancho" disabled={ocupado} onClick={() => abrirCamara("etiqueta")}>

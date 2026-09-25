@@ -3,21 +3,18 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Coleccion } from "@/lib/tipos";
-import { IconoPrenda } from "./Iconos";
 import type { ConSesion } from "./tipos";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-// Tarjetas de colecciones (ej. "Invierno NY"). Al tocar una se entra a sus tiendas.
+// Lista de colecciones (ej. "Invierno NY"). Al tocar una se entra a sus tiendas.
 export default function Colecciones({
   colecciones,
-  activa,
   alElegir,
   conSesion,
   alCambiar,
 }: {
   colecciones: Coleccion[];
-  activa: number | null;
   alElegir: (id: number) => void;
   conSesion: ConSesion;
   alCambiar: () => Promise<void>;
@@ -49,51 +46,39 @@ export default function Colecciones({
 
   return (
     <>
-      {error && <div className="estado error" style={{ marginTop: 0, marginBottom: 12 }}>{error}</div>}
-      <div className="colecciones">
+      {error && <div className="aviso error">{error}</div>}
+      <ul className="lista">
         {colecciones.map((c) => (
-          <article
-            key={c.id}
-            className={`coleccion${c.id === activa ? " activa" : ""}`}
-            onClick={() => alElegir(c.id)}
-          >
-            <div className={`coleccion-mosaico n${Math.min(c.portadas.length, 4)}`}>
-              {c.portadas.length ? (
-                c.portadas.slice(0, 4).map((f) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={f} src={f} alt="" loading="lazy" />
-                ))
+          <li key={c.id} className="fila-coleccion" onClick={() => alElegir(c.id)}>
+            <div className="miniatura">
+              {c.portadas[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.portadas[0]} alt="" loading="lazy" />
               ) : (
-                <span className="coleccion-vacia"><IconoPrenda tam={34} /></span>
+                <span>{c.nombre.slice(0, 1).toUpperCase()}</span>
               )}
             </div>
-            <div className="coleccion-texto">
-              <div className="coleccion-nombre">
-                {c.nombre}
-                <button
-                  className="coleccion-editar"
-                  aria-label="Cambiar nombre"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    renombrar(c);
-                  }}
-                >
-                  ✎
-                </button>
-              </div>
-              <div className="coleccion-datos">
-                <span><strong>{c.muestras}</strong> muestras</span>
-                <span><strong>{c.tiendas}</strong> tiendas</span>
-                <span><strong>{usd.format(c.gasto)}</strong> gastado</span>
+            <div className="fila-cuerpo">
+              <div className="fila-titulo">{c.nombre}</div>
+              <div className="fila-sub">
+                {c.muestras} muestras · {c.tiendas} tiendas · {usd.format(c.gasto)}
               </div>
             </div>
-          </article>
+            <button
+              className="icono-boton"
+              aria-label="Cambiar nombre"
+              onClick={(e) => {
+                e.stopPropagation();
+                renombrar(c);
+              }}
+            >
+              ✎
+            </button>
+            <span className="chevron" aria-hidden>›</span>
+          </li>
         ))}
-        <button className="coleccion nueva" onClick={nueva}>
-          <span className="mas">+</span>
-          Nueva colección
-        </button>
-      </div>
+      </ul>
+      <button className="boton ancho" onClick={nueva}>+ Nueva colección</button>
     </>
   );
 }
