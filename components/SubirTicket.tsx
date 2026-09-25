@@ -27,11 +27,13 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 // se marcan como compradas y se busca foto en internet a las que no tengan.
 export default function SubirTicket({
   muestras,
+  coleccionId,
   conSesion,
   alCerrar,
   alCambiar,
 }: {
   muestras: Muestra[];
+  coleccionId: number | null;
   conSesion: ConSesion;
   alCerrar: () => void;
   alCambiar: () => Promise<void>;
@@ -42,7 +44,6 @@ export default function SubirTicket({
   const [renglones, setRenglones] = useState<Renglon[]>([]);
   const [acciones, setAcciones] = useState<Accion[]>([]);
   const [deptNuevas, setDeptNuevas] = useState<Departamento>("Mujer");
-  const [buscarFotos, setBuscarFotos] = useState(true);
   const [avance, setAvance] = useState("");
   const [resumen, setResumen] = useState("");
   const [error, setError] = useState("");
@@ -59,7 +60,7 @@ export default function SubirTicket({
       // Más resolución que las fotos normales para que se lean los renglones.
       const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirImagen(a, 2400))));
       const r = await conSesion(() =>
-        api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes }) }),
+        api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes, coleccion_id: coleccionId }) }),
       );
       if (!r) return;
       if (r.renglones.length === 0) {
@@ -89,6 +90,7 @@ export default function SubirTicket({
           body: JSON.stringify({
             tienda,
             fecha,
+            coleccion_id: coleccionId,
             renglones: renglones.map((x, i) => {
               const a = acciones[i];
               return {
@@ -104,42 +106,38 @@ export default function SubirTicket({
       );
       if (!r) return;
 
-      // Nuevas: descripción clara + datos + foto (con búsqueda en internet).
-      // Existentes sin foto de prenda: solo se busca la foto.
+      // Nuevas y existentes: descripción clara, marca y datos (con búsqueda en internet).
+      // Las fotos que ya tienes NUNCA se tocan: solo se busca foto para las que no tienen ninguna.
+      const textoDe = new Map<number, string>();
+      renglones.forEach((x, i) => {
+        const a = acciones[i];
+        if (a.startsWith("m")) textoDe.set(Number(a.slice(1)), x.descripcion);
+      });
+      const porCompletar = [...r.creadas, ...r.actualizadas];
       let conFoto = 0;
-      let sinFoto = 0;
-      for (let i = 0; i < r.creadas.length; i++) {
-        setAvance(`Completando datos y fotos ${i + 1} de ${r.creadas.length}…`);
+      for (let i = 0; i < porCompletar.length; i++) {
+        setAvance(`Actualizando descripciones ${i + 1} de ${porCompletar.length}…`);
+        const id = porCompletar[i];
         try {
-          const m = await api<Muestra>(`/api/samples/${r.creadas[i]}/completar`, { method: "POST" });
-          if (m.fotos_prenda?.length) conFoto++;
-          else sinFoto++;
+          const antes = muestras.find((m) => m.id === id)?.fotos_prenda?.length ?? 0;
+          const m = await api<Muestra>(`/api/samples/${id}/completar`, {
+            method: "POST",
+            body: JSON.stringify({ texto_ticket: textoDe.get(id) ?? "" }),
+          });
+          if (!antes && m.fotos_prenda?.length) conFoto++;
         } catch {
-          sinFoto++;
-        }
-      }
-      if (buscarFotos) {
-        const sinPrenda = r.actualizadas.filter((id) => !(muestras.find((m) => m.id === id)?.fotos_prenda ?? []).length);
-        for (let i = 0; i < sinPrenda.length; i++) {
-          setAvance(`Buscando fotos en internet ${i + 1} de ${sinPrenda.length}…`);
-          try {
-            await api(`/api/samples/${sinPrenda[i]}/buscar-foto`, { method: "POST" });
-            conFoto++;
-          } catch {
-            sinFoto++;
-          }
+          /* se sigue con las demás */
         }
       }
 
       await alCambiar();
+      const faltaban = renglones.filter((_, i) => acciones[i] === "crear").map((x) => x.descripcion || x.codigo);
       setResumen(
         [
           `${acciones.filter((a) => a !== "ignorar").length} artículos del ticket`,
-          r.actualizadas.length && `${r.actualizadas.length} ya existían y quedaron como compradas`,
-          r.creadas.length && `${r.creadas.length} nuevas`,
-          tienda && `Búscalas con el filtro de tienda "${tienda}"`,
-          conFoto && `${conFoto} foto(s) encontradas en internet`,
-          sinFoto && `${sinFoto} sin foto (puedes tomarla tú desde ⋯)`,
+          r.actualizadas.length && `${r.actualizadas.length} ya estaban: se actualizaron precio y descripción (sus fotos no se tocaron)`,
+          faltaban.length && `Faltaban en la app ${faltaban.length}: ${faltaban.join(", ")} (ya se agregaron)`,
+          conFoto && `${conFoto} foto(s) nuevas desde internet para las que no tenían`,
         ]
           .filter(Boolean)
           .join(". ") + ".",
@@ -204,6 +202,7 @@ export default function SubirTicket({
                     {r.cantidad > 1 ? ` × ${r.cantidad}` : ""}
                   </span>
                 </div>
+                {acciones[i] === "crear" && <span className="etiqueta-falta">Falta en la app</span>}
                 {(r.codigo || r.color) && (
                   <div className="pequeno">{[r.color && `Color ${r.color}`, r.codigo && `Código ${r.codigo}`].filter(Boolean).join(" · ")}</div>
                 )}
@@ -246,10 +245,9 @@ export default function SubirTicket({
               </div>
             )}
 
-            <label className="casilla-check">
-              <input type="checkbox" checked={buscarFotos} onChange={(e) => setBuscarFotos(e.target.checked)} />
-              Buscar foto en internet para las que no tengan
-            </label>
+            <p className="nota-segura">
+              🔒 Tus fotos no se tocan. Se actualizan precio y descripción, y solo se busca foto para las que no tienen.
+            </p>
 
             <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
               <button className="boton" onClick={alCerrar}>Cancelar</button>

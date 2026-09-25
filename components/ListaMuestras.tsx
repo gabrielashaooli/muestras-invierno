@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { textoNormal } from "@/lib/codigos";
 import { gruposDuplicados } from "@/lib/duplicados";
 import { comprimirImagen } from "@/lib/imagen";
-import type { Departamento, KeyItem, Muestra } from "@/lib/tipos";
+import type { Coleccion, Departamento, KeyItem, Muestra } from "@/lib/tipos";
+import Colecciones from "./Colecciones";
 import DetalleMuestra from "./DetalleMuestra";
 import EditarMuestra from "./EditarMuestra";
 import FiltroDept from "./FiltroDept";
@@ -15,7 +16,10 @@ import VisorFotos, { type EstadoVisor } from "./VisorFotos";
 import type { ConSesion } from "./tipos";
 
 interface Props {
-  muestras: Muestra[];
+  muestras: Muestra[]; // solo las de la colección activa
+  colecciones: Coleccion[];
+  activa: number | null;
+  alElegirColeccion: (id: number) => void;
   keyItems: KeyItem[];
   conSesion: ConSesion;
   alCambiar: () => Promise<void>;
@@ -23,7 +27,17 @@ interface Props {
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar }: Props) {
+export default function ListaMuestras({
+  muestras,
+  colecciones,
+  activa,
+  alElegirColeccion,
+  keyItems,
+  conSesion,
+  alCambiar,
+}: Props) {
+  // Primero se ven las colecciones; al tocar una se entra a sus tiendas.
+  const [dentro, setDentro] = useState(false);
   // Filtros
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Departamento | "">("");
@@ -134,9 +148,29 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
     .map(([, s]) => s);
   const hayFiltros = Boolean(filtro || filtroTienda || filtroEstatus || q);
   const detalle = detalleId !== null ? muestras.find((m) => m.id === detalleId) ?? null : null;
+  const coleccion = colecciones.find((c) => c.id === activa);
+
+  if (!dentro) {
+    return (
+      <Colecciones
+        colecciones={colecciones}
+        activa={activa}
+        alElegir={(id) => {
+          alElegirColeccion(id);
+          setDentro(true);
+        }}
+        conSesion={conSesion}
+        alCambiar={alCambiar}
+      />
+    );
+  }
 
   return (
     <>
+      <div className="migas">
+        <button className="migas-atras" onClick={() => setDentro(false)}>‹ Colecciones</button>
+        <span className="migas-actual">{coleccion?.nombre}</span>
+      </div>
       <input ref={entradaFoto} className="oculto" type="file" accept="image/*" onChange={alElegirFoto} />
 
       <div className="barra-lista">
@@ -269,7 +303,7 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
       )}
 
       {ticket && (
-        <SubirTicket muestras={muestras} conSesion={conSesion} alCerrar={() => setTicket(false)} alCambiar={alCambiar} />
+        <SubirTicket muestras={muestras} coleccionId={activa} conSesion={conSesion} alCerrar={() => setTicket(false)} alCambiar={alCambiar} />
       )}
 
       {visor && <VisorFotos visor={visor} setVisor={setVisor} conSesion={conSesion} alCambiar={alCambiar} alError={setError} />}

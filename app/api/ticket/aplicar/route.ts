@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     r.precio === null || r.precio === undefined || r.precio === "" ? null : parsePrecio(String(r.precio));
 
   const fecha = texto(c?.fecha, 50);
+  const coleccionId = Number(c?.coleccion_id) > 0 ? Number(c.coleccion_id) : null;
 
   // Colores sin repetir, en el orden en que aparecen.
   const unirColores = (...listas: string[]) =>
@@ -90,9 +91,9 @@ export async function POST(req: NextRequest) {
     }
     const dept = esDepartamento(primero.dept) ? primero.dept : "Mujer";
     const [nueva] = (await sql`
-      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, estilo, color, origen, ticket_linea)
+      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, estilo, color, origen, ticket_linea, coleccion_id)
       VALUES (${dept}, 'comprado', ${texto(primero.descripcion)}, ${tienda}, ${precio}, ${cantidad},
-              ${texto(primero.codigo, 100)}, ${texto(primero.estilo, 100)}, ${colores}, 'ticket', ${linea})
+              ${texto(primero.codigo, 100)}, ${texto(primero.estilo, 100)}, ${colores}, 'ticket', ${linea}, ${coleccionId})
       RETURNING id`) as { id: number }[];
     creadas.push(nueva.id);
   }

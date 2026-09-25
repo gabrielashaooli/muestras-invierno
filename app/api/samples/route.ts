@@ -54,15 +54,21 @@ export async function POST(req: NextRequest) {
     : [];
 
   const sql = await db();
+  // Colección: la elegida, o la más reciente si no viene.
+  const coleccionId =
+    Number(c.coleccion_id) > 0
+      ? Number(c.coleccion_id)
+      : (((await sql`SELECT id FROM colecciones WHERE eliminado_en IS NULL ORDER BY creado_en DESC LIMIT 1`) as { id: number }[])[0]?.id ?? null);
   const [fila] = (await sql`
     INSERT INTO samples (
       dept, status, descripcion, key_item_id, tienda, marca, precio_usd, cantidad,
-      talla, color, tela, codigo, estilo, notas, fuentes, fotos, fotos_prenda
+      talla, color, tela, codigo, estilo, notas, fuentes, fotos, fotos_prenda, coleccion_id
     ) VALUES (
       ${c.dept}, ${status}, ${texto(c.descripcion)}, ${keyItemId}, ${texto(c.tienda, 200)},
       ${texto(c.marca, 200)}, ${precio}, ${cantidadValida(c.cantidad)}, ${texto(c.talla, 100)}, ${texto(c.color, 100)},
       ${texto(c.tela, 300)}, ${texto(c.codigo, 100)}, ${texto(c.estilo, 100)},
-      ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb
+      ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb,
+      ${coleccionId}
     )
     RETURNING *`) as Record<string, unknown>[];
   // ¿Ya existía esta prenda (mismo código/UPC o estilo)? Se junta con la existente en vez de repetirla.
@@ -70,7 +76,7 @@ export async function POST(req: NextRequest) {
   if (String(nueva.codigo ?? "").trim() || String(nueva.estilo ?? "").trim()) {
     const otras = (await sql`
       SELECT id, codigo, estilo, marca, descripcion, tienda FROM samples
-      WHERE eliminado_en IS NULL AND id <> ${Number(nueva.id)}`) as Record<string, unknown>[];
+      WHERE eliminado_en IS NULL AND id <> ${Number(nueva.id)} AND coleccion_id IS NOT DISTINCT FROM ${coleccionId}`) as Record<string, unknown>[];
     const t = (v: unknown) => String(v ?? "");
     const comoDup = (f: Record<string, unknown>) => ({
       id: Number(f.id), codigo: t(f.codigo), estilo: t(f.estilo), marca: "", descripcion: "", tienda: "",

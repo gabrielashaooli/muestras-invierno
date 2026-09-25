@@ -36,6 +36,7 @@ export interface Muestra {
   fotos: string[]; // fotos de etiquetas
   fotos_prenda: string[]; // fotos de la prenda (puesta / en modelo)
   origen?: string; // "ticket" si se creó desde un ticket
+  coleccion_id?: number | null;
   auto_revisado?: boolean; // ya se completó automáticamente con Claude
   creado_en: string;
 }
@@ -70,4 +71,15 @@ export interface Analisis {
 export function cantidadValida(valor: unknown): number {
   const n = Math.round(Number(valor));
   return Number.isFinite(n) && n >= 1 ? Math.min(n, 999) : 1;
+}
+
+export interface Coleccion {
+  id: number;
+  nombre: string;
+  creado_en: string;
+  muestras: number;
+  compradas: number;
+  gasto: number;
+  tiendas: number;
+  portadas: string[];
 }

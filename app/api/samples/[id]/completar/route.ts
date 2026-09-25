@@ -11,7 +11,8 @@ export const maxDuration = 180; // búsqueda del producto + búsqueda de foto
 // POST /api/samples/:id/completar — para muestras creadas desde un ticket: escribe una descripción clara,
 // llena los datos que falten y, si no tiene foto de prenda, intenta encontrarla en internet.
 // Se marca como revisada aunque no se encuentre nada, para no repetir. Nada se borra (hay respaldo).
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// Body opcional: { texto_ticket } — texto del renglón del ticket (para muestras que ya existían).
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id)) return errorJson("Id inválido");
 
@@ -20,10 +21,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!m) return errorJson("No existe la muestra", 404);
 
   const s = (v: unknown) => String(v ?? "").trim();
+  const cuerpo = await req.json().catch(() => ({}));
+  const textoTicket = s(cuerpo?.texto_ticket).slice(0, 200);
   let r;
   try {
     r = await completarDesdeTicket({
-      texto: s(m.descripcion),
+      texto: [textoTicket, s(m.marca), s(m.descripcion)].filter(Boolean).join(" · "),
       codigo: s(m.codigo),
       tienda: s(m.tienda),
       precio: m.precio_usd === null ? null : Number(m.precio_usd),

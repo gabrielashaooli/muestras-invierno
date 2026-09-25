@@ -23,8 +23,15 @@ export async function POST(req: NextRequest) {
       marca: String(f.marca ?? ""),
       descripcion: String(f.descripcion ?? ""),
       tienda: String(f.tienda ?? ""),
+      coleccion_id: f.coleccion_id,
     }));
-    grupos = gruposDuplicados(lista);
+    // Solo se juntan repetidas dentro de la misma colección (un viaje distinto puede repetir prenda).
+    const porColeccion = new Map<string, typeof lista>();
+    for (const m of lista) {
+      const k = String(m.coleccion_id ?? "");
+      porColeccion.set(k, [...(porColeccion.get(k) ?? []), m]);
+    }
+    grupos = [...porColeccion.values()].flatMap((l) => gruposDuplicados(l));
   } else if (Array.isArray(c?.ids) && c.ids.length >= 2) {
     const ids = new Set(c.ids.map(Number));
     grupos = [filas.filter((f) => ids.has(Number(f.id)))];

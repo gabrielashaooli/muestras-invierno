@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, NoAutorizado } from "@/lib/api";
-import type { KeyItem, Muestra } from "@/lib/tipos";
+import { guardarLocal, leerLocal } from "@/lib/local";
+import type { Coleccion, KeyItem, Muestra } from "@/lib/tipos";
 import Capturar from "@/components/Capturar";
 import ListaMuestras from "@/components/ListaMuestras";
 import KeyItems from "@/components/KeyItems";
@@ -24,6 +25,9 @@ export default function Inicio() {
   const [pestana, setPestana] = useState<Pestana>("capturar");
   const [muestras, setMuestras] = useState<Muestra[]>([]);
   const [keyItems, setKeyItems] = useState<KeyItem[]>([]);
+  const [colecciones, setColecciones] = useState<Coleccion[]>([]);
+  const [activa, setActiva] = useState<number | null>(null);
+  const [elegirColeccion, setElegirColeccion] = useState(false);
   const [error, setError] = useState("");
 
   // Envuelve una llamada a la API y regresa a la pantalla de acceso si expiró la sesión.
@@ -41,16 +45,31 @@ export default function Inicio() {
 
   const recargar = useCallback(async () => {
     try {
-      const [m, k] = (await conSesion(() =>
-        Promise.all([api<Muestra[]>("/api/samples"), api<KeyItem[]>("/api/keyitems")]),
-      )) ?? [null, null];
-      if (m) setMuestras(m);
-      if (k) setKeyItems(k);
+      const r = await conSesion(() =>
+        Promise.all([api<Muestra[]>("/api/samples"), api<KeyItem[]>("/api/keyitems"), api<Coleccion[]>("/api/colecciones")]),
+      );
+      if (!r) return;
+      setMuestras(r[0]);
+      setKeyItems(r[1]);
+      setColecciones(r[2]);
       setError("");
     } catch (e) {
       setError((e as Error).message);
     }
   }, [conSesion]);
+
+  // Colección activa: la última que se usó en este teléfono, o la más reciente.
+  useEffect(() => {
+    if (!colecciones.length) return;
+    if (activa !== null && colecciones.some((c) => c.id === activa)) return;
+    const guardada = Number(leerLocal("coleccion"));
+    setActiva(colecciones.some((c) => c.id === guardada) ? guardada : colecciones[0].id);
+  }, [colecciones, activa]);
+
+  function cambiarColeccion(id: number) {
+    setActiva(id);
+    guardarLocal("coleccion", String(id));
+  }
 
   // Muestras creadas desde un ticket que aún no se completan: la app las arregla sola
   // (descripción clara, datos y foto), una por una, sin que la persona tenga que tocar nada.
@@ -89,16 +108,21 @@ export default function Inicio() {
   if (sesion === "cargando") return <div className="acceso"><div className="girando" /></div>;
   if (sesion === "pendiente") return <Acceso alEntrar={() => setSesion("ok")} />;
 
+  const coleccion = colecciones.find((c) => c.id === activa);
+  const deLaColeccion = muestras.filter((m) => m.coleccion_id === activa);
+
   return (
     <>
       <main className="app">
         <header className="encabezado">
-          <div>
-            <p className="sobretitulo">Muestras · Invierno</p>
+          <div style={{ minWidth: 0 }}>
+            <button className="selector-coleccion" onClick={() => setElegirColeccion(true)}>
+              {coleccion?.nombre ?? "Muestras"} <span aria-hidden>▾</span>
+            </button>
             <h1>{PESTANAS.find((p) => p.id === pestana)?.titulo}</h1>
           </div>
           <span className="pastilla">
-            {muestras.length} {muestras.length === 1 ? "muestra" : "muestras"}
+            {deLaColeccion.length} {deLaColeccion.length === 1 ? "muestra" : "muestras"}
           </span>
         </header>
 
@@ -110,16 +134,55 @@ export default function Inicio() {
         )}
 
         {pestana === "capturar" && (
-          <Capturar keyItems={keyItems} conSesion={conSesion} alGuardar={recargar} />
+          <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} />
         )}
         {pestana === "muestras" && (
-          <ListaMuestras muestras={muestras} keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
+          <ListaMuestras
+            muestras={deLaColeccion}
+            colecciones={colecciones}
+            activa={activa}
+            alElegirColeccion={cambiarColeccion}
+            keyItems={keyItems}
+            conSesion={conSesion}
+            alCambiar={recargar}
+          />
         )}
         {pestana === "keyitems" && (
           <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
         )}
-        {pestana === "resumen" && <Resumen muestras={muestras} keyItems={keyItems} />}
+        {pestana === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} />}
       </main>
+
+      {elegirColeccion && (
+        <div className="hoja-fondo" onClick={() => setElegirColeccion(false)}>
+          <div className="hoja" role="menu" onClick={(e) => e.stopPropagation()}>
+            <p className="hoja-titulo">Colección</p>
+            {colecciones.map((c) => (
+              <button
+                key={c.id}
+                role="menuitem"
+                className={c.id === activa ? "elegida" : ""}
+                onClick={() => {
+                  cambiarColeccion(c.id);
+                  setElegirColeccion(false);
+                }}
+              >
+                {c.nombre}
+                <small>{c.muestras} muestras · {c.tiendas} tiendas</small>
+              </button>
+            ))}
+            <button
+              role="menuitem"
+              onClick={() => {
+                setElegirColeccion(false);
+                setPestana("muestras");
+              }}
+            >
+              Ver todas / nueva colección
+            </button>
+          </div>
+        </div>
+      )}
 
       <nav className="pestanas" role="tablist">
         {PESTANAS.map((p) => (

@@ -13,7 +13,15 @@ const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" 
 // Gasto = precio × cantidad de piezas.
 const suma = (lista: Muestra[]) => lista.reduce((t, m) => t + (m.precio_usd ?? 0) * (m.cantidad ?? 1), 0);
 
-export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; keyItems: KeyItem[] }) {
+export default function Resumen({
+  muestras,
+  keyItems,
+  titulo: nombreColeccion,
+}: {
+  muestras: Muestra[];
+  keyItems: KeyItem[];
+  titulo?: string;
+}) {
   // Exportar PDF con fotos: qué incluir y avance.
   const [soloCompradas, setSoloCompradas] = useState(false);
   const [deptPdf, setDeptPdf] = useState<Departamento | "">("");
@@ -28,10 +36,10 @@ export default function Resumen({ muestras, keyItems }: { muestras: Muestra[]; k
     setErrorPdf("");
     setAvance("Preparando…");
     try {
-      const titulo = ["Muestras Invierno", deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
+      const titulo = [`Muestras ${nombreColeccion ?? ""}`.trim(), deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
       const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`));
       const fecha = new Date().toISOString().slice(0, 10);
-      await compartirArchivo(blob, `muestras-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}-${fecha}.pdf`.toLowerCase());
+      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}-${fecha}.pdf`.toLowerCase());
     } catch (e) {
       setErrorPdf(`No se pudo crear el PDF: ${(e as Error).message}`);
     } finally {

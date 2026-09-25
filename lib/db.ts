@@ -77,6 +77,21 @@ async function crearTablas() {
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS unida_a INTEGER`;
   // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
   await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
+  // Colecciones (ej. "Invierno NY"): agrupan las muestras de un viaje o temporada.
+  await sql`
+    CREATE TABLE IF NOT EXISTS colecciones (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+      eliminado_en TIMESTAMPTZ
+    )`;
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS coleccion_id INTEGER`;
+  // Primera vez: se crea "Invierno NY" y ahí quedan todas las muestras que ya existían.
+  const [hay] = (await sql`SELECT count(*)::int AS n FROM colecciones`) as { n: number }[];
+  if (hay.n === 0) await sql`INSERT INTO colecciones (nombre) VALUES ('Invierno NY')`;
+  await sql`
+    UPDATE samples SET coleccion_id = (SELECT id FROM colecciones WHERE eliminado_en IS NULL ORDER BY id LIMIT 1)
+    WHERE coleccion_id IS NULL`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

@@ -16,9 +16,15 @@ export async function POST(req: NextRequest) {
   if (imagenes.length === 0) return errorJson("No se recibió la foto del ticket");
 
   const sql = await db();
-  const muestras = (await sql`
-    SELECT id, marca, descripcion, codigo, estilo, talla, color, precio_usd
-    FROM samples WHERE eliminado_en IS NULL ORDER BY creado_en DESC LIMIT 400`) as Record<string, unknown>[];
+  const coleccionId = Number(cuerpo?.coleccion_id) > 0 ? Number(cuerpo.coleccion_id) : null;
+  // Solo se comparan las muestras de la colección actual (si se indicó).
+  const muestras = (coleccionId
+    ? await sql`
+        SELECT id, marca, descripcion, codigo, estilo, talla, color, precio_usd
+        FROM samples WHERE eliminado_en IS NULL AND coleccion_id = ${coleccionId} ORDER BY creado_en DESC LIMIT 400`
+    : await sql`
+        SELECT id, marca, descripcion, codigo, estilo, talla, color, precio_usd
+        FROM samples WHERE eliminado_en IS NULL ORDER BY creado_en DESC LIMIT 400`) as Record<string, unknown>[];
   const lista: MuestraParaTicket[] = muestras.map((m) => ({
     id: Number(m.id),
     marca: String(m.marca ?? ""),

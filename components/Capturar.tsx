@@ -73,11 +73,12 @@ const MAX_FOTOS_ANALISIS = 6;
 
 interface Props {
   keyItems: KeyItem[];
+  coleccionId: number | null; // colección donde se guarda la muestra
   conSesion: ConSesion;
   alGuardar: () => Promise<void>;
 }
 
-export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
+export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }: Props) {
   const [dept, setDept] = useState<Departamento>("Mujer");
   const [status, setStatus] = useState<Estatus>("solo_foto");
   const [cantidad, setCantidad] = useState(1);
@@ -322,6 +323,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
             dept,
             status,
             cantidad,
+            coleccion_id: coleccionId,
             key_item_id: campos.key_item_id ? Number(campos.key_item_id) : null,
             precio_usd: precio,
             // La foto de la prenda se guarda aparte como referencia; las demás son etiquetas.
