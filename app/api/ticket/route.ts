@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ErrorAnalisis, limpiarImagen, type Imagen } from "@/lib/analisis";
 import { db } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
-import { leerTicket, type MuestraParaTicket } from "@/lib/ticket";
+import { aMuestrasParaTicket, leerTicket } from "@/lib/ticket";
 
 export const maxDuration = 120;
 
@@ -25,16 +25,7 @@ export async function POST(req: NextRequest) {
     : await sql`
         SELECT id, marca, descripcion, codigo, estilo, talla, color, precio_usd
         FROM samples WHERE eliminado_en IS NULL ORDER BY creado_en DESC LIMIT 400`) as Record<string, unknown>[];
-  const lista: MuestraParaTicket[] = muestras.map((m) => ({
-    id: Number(m.id),
-    marca: String(m.marca ?? ""),
-    descripcion: String(m.descripcion ?? ""),
-    codigo: String(m.codigo ?? ""),
-    estilo: String(m.estilo ?? ""),
-    talla: String(m.talla ?? ""),
-    color: String(m.color ?? ""),
-    precio_usd: m.precio_usd === null ? null : Number(m.precio_usd),
-  }));
+  const lista = aMuestrasParaTicket(muestras);
 
   try {
     return NextResponse.json(await leerTicket(imagenes, lista));

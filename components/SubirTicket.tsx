@@ -60,25 +60,7 @@ export default function SubirTicket({
       // Más resolución que las fotos normales para que se lean los renglones.
       const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirImagen(a, 2400))));
 
-      // Antes de comparar: las muestras con fotos pero sin descripción o sin código se completan leyendo
-      // su etiqueta (así el ticket las reconoce). Solo se llenan campos vacíos; las fotos no se tocan.
-      const incompletas = muestras.filter(
-        (m) =>
-          !m.auto_revisado &&
-          m.origen !== "ticket" &&
-          m.fotos.length + (m.fotos_prenda?.length ?? 0) > 0 &&
-          (!m.descripcion?.trim() || !m.codigo?.trim()),
-      );
-      for (let i = 0; i < incompletas.length; i++) {
-        setAvance(`Preparando tus muestras ${i + 1} de ${incompletas.length}…`);
-        try {
-          await api(`/api/samples/${incompletas[i].id}/analizar`, { method: "POST", body: JSON.stringify({ modo: "llenar" }) });
-        } catch {
-          /* se sigue */
-        }
-      }
-      if (incompletas.length) await alCambiar();
-      setAvance("");
+
       const r = await conSesion(() =>
         api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes, coleccion_id: coleccionId }) }),
       );
@@ -87,6 +69,46 @@ export default function SubirTicket({
         setError("No se encontraron artículos en el ticket. Intenta con otra foto más clara.");
         setPaso("elegir");
         return;
+      }
+
+      // Si faltan renglones por reconocer: se leen rápido (sin internet) los códigos UPC / DPCI de las etiquetas
+      // de tus muestras de esa tienda que aún no se han leído, y se vuelve a comparar. No toca fotos.
+      if (r.renglones.some((x) => x.muestraId === null)) {
+        const clave = (r.tienda || "").toLowerCase().split(/\s+/)[0] ?? "";
+        const porLeer = muestras.filter(
+          (m) =>
+            !m.codigos_leidos &&
+            m.status !== "comprado" &&
+            m.fotos.length + (m.fotos_prenda?.length ?? 0) > 0 &&
+            (!clave || !m.tienda?.trim() || m.tienda.toLowerCase().includes(clave)),
+        );
+        let hechas = 0;
+        const cola = [...porLeer];
+        const trabajador = async () => {
+          while (cola.length) {
+            const m = cola.shift()!;
+            try {
+              await api(`/api/samples/${m.id}/leer-codigos`, { method: "POST" });
+            } catch {
+              /* se sigue */
+            }
+            hechas++;
+            setAvance(`Leyendo etiquetas de tus muestras ${hechas} de ${porLeer.length}…`);
+          }
+        };
+        if (porLeer.length) {
+          setAvance(`Leyendo etiquetas de tus muestras 0 de ${porLeer.length}…`);
+          await Promise.all([trabajador(), trabajador(), trabajador()]); // 3 a la vez
+          const e = await conSesion(() =>
+            api<{ renglones: Renglon[] }>("/api/ticket/emparejar", {
+              method: "POST",
+              body: JSON.stringify({ renglones: r.renglones, coleccion_id: coleccionId }),
+            }),
+          );
+          if (e) r.renglones = e.renglones;
+          await alCambiar();
+        }
+        setAvance("");
       }
       setTienda(r.tienda);
       setFecha(r.fecha ?? "");

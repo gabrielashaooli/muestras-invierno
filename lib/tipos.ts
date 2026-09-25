@@ -38,6 +38,7 @@ export interface Muestra {
   origen?: string; // "ticket" si se creó desde un ticket
   coleccion_id?: number | null;
   auto_revisado?: boolean; // ya se completó automáticamente con Claude
+  codigos_leidos?: boolean; // ya se leyeron UPC / DPCI de sus etiquetas
   creado_en: string;
 }
 

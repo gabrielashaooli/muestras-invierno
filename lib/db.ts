@@ -75,6 +75,8 @@ async function crearTablas() {
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS ticket_linea TEXT NOT NULL DEFAULT ''`;
   // Si la muestra se juntó con otra (repetida), aquí queda el id de la que se conservó.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS unida_a INTEGER`;
+  // Ya se leyeron los códigos (UPC / DPCI / estilo) de sus etiquetas para reconocerla en tickets.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS codigos_leidos BOOLEAN NOT NULL DEFAULT false`;
   // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
   await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
   // Colecciones (ej. "Invierno NY"): agrupan las muestras de un viaje o temporada.

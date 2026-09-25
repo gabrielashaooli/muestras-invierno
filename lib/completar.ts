@@ -29,6 +29,9 @@ export async function completarDesdeTicket(p: { texto: string; codigo: string; t
   const pista = [
     `Texto en el ticket: ${p.texto || "(sin texto)"}`,
     p.codigo && `Código/UPC: ${p.codigo}`,
+    // En Target el número del ticket es el DPCI (ej. 032130078 → 032-13-0078), útil para buscar en target.com.
+    /target/i.test(p.tienda) && /^\d{9}$/.test(p.codigo) &&
+      `DPCI de Target: ${p.codigo.slice(0, 3)}-${p.codigo.slice(3, 5)}-${p.codigo.slice(5)}`,
     p.tienda && `Tienda: ${p.tienda}`,
     p.precio !== null && `Precio pagado: $${p.precio}`,
   ].filter(Boolean).join("\n");

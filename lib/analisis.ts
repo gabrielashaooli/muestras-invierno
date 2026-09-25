@@ -48,6 +48,8 @@ Precio ("precio") — sé muy estricto:
 Otros campos:
 - "desc": descripción corta en español de la prenda (ej. "Suéter de punto trenzado cuello redondo").
 - "marca", "talla", "estilo", "codigo": tal como aparecen en la etiqueta. "codigo" es el UPC/EAN completo.
+- "estilo": el número de estilo/artículo. En etiquetas de Target pon el DPCI (formato 000-00-0000, ej. "032-13-0078");
+  en Walmart el número de artículo si aparece. Estos números salen en el ticket y sirven para reconocer la prenda.
 - "tela": composición tal cual (ej. "60% algodón, 40% poliéster"), de la etiqueta o de una fuente confirmada.
 - "color": en español, según la etiqueta o lo que se ve claramente en la foto. Si la prenda tiene varios colores,
   ponlos todos separados por coma (ej. "Negro, Blanco").
