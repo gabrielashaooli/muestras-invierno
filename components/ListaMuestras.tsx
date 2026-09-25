@@ -22,6 +22,8 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" 
 
 export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar }: Props) {
   const [filtro, setFiltro] = useState<Departamento | "">("");
+  const [filtroTienda, setFiltroTienda] = useState("");
+  const [filtroEstatus, setFiltroEstatus] = useState<"" | "comprado" | "solo_foto">("");
   const [borrando, setBorrando] = useState<number | null>(null);
   const [menu, setMenu] = useState<Muestra | null>(null); // menú ⋯ abierto
   const [analizandoEn, setAnalizandoEn] = useState<number | null>(null);
@@ -113,6 +115,22 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
       setCambiandoPortada(false);
     }
   }
+  // Quita la foto que se está viendo (queda guardada aparte, no se borra).
+  async function quitarFotoVisor() {
+    if (!visor || !confirm("¿Quitar esta foto de la muestra?")) return;
+    const url = visor.fotos[visor.i];
+    setCambiandoPortada(true);
+    try {
+      await conSesion(() => api(`/api/samples/${visor.id}`, { method: "PATCH", body: JSON.stringify({ quitar_foto: url }) }));
+      const restantes = visor.fotos.filter((f) => f !== url);
+      setVisor(restantes.length ? { ...visor, fotos: restantes, i: 0, prenda: visor.prenda === url ? undefined : visor.prenda } : null);
+      await alCambiar();
+    } catch (e) {
+      setError(`No se pudo quitar la foto: ${(e as Error).message}`);
+    } finally {
+      setCambiandoPortada(false);
+    }
+  }
   const [error, setError] = useState("");
   const [subiendoEn, setSubiendoEn] = useState<number | null>(null);
   const entradaFoto = useRef<HTMLInputElement>(null);
@@ -151,7 +169,16 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
     }
   }
 
-  const visibles = filtro ? muestras.filter((m) => m.dept === filtro) : muestras;
+  // Tiendas registradas (sin distinguir mayúsculas ni espacios).
+  const claveTienda = (t: string) => t.trim().toLowerCase();
+  const tiendas = [...new Map(muestras.filter((m) => m.tienda?.trim()).map((m) => [claveTienda(m.tienda), m.tienda.trim()])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const visibles = muestras.filter(
+    (m) =>
+      (!filtro || m.dept === filtro) &&
+      (!filtroTienda || (filtroTienda === "__sin" ? !m.tienda?.trim() : claveTienda(m.tienda ?? "") === filtroTienda)) &&
+      (!filtroEstatus || m.status === filtroEstatus),
+  );
 
   async function eliminar(m: Muestra) {
     if (!confirm(`¿Quitar "${m.descripcion || "muestra sin nombre"}" de la lista? No se borra: queda guardada y se puede recuperar.`)) return;
@@ -175,6 +202,25 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
         🧾 Subir ticket de compra
       </button>
       <FiltroDept valor={filtro} alCambiar={setFiltro} />
+      <div className="filtros">
+        <select value={filtroTienda} onChange={(e) => setFiltroTienda(e.target.value)} aria-label="Filtrar por tienda">
+          <option value="">Todas las tiendas</option>
+          {tiendas.map(([clave, nombre]) => (
+            <option key={clave} value={clave}>{nombre}</option>
+          ))}
+          <option value="__sin">Sin tienda</option>
+        </select>
+        <select value={filtroEstatus} onChange={(e) => setFiltroEstatus(e.target.value as typeof filtroEstatus)} aria-label="Filtrar por estatus">
+          <option value="">Compradas y solo foto</option>
+          <option value="comprado">Solo compradas</option>
+          <option value="solo_foto">Solo foto (no compradas)</option>
+        </select>
+      </div>
+      {(filtro || filtroTienda || filtroEstatus) && (
+        <p className="pequeno" style={{ margin: "-4px 2px 12px" }}>
+          {visibles.length} {visibles.length === 1 ? "muestra" : "muestras"} con estos filtros
+        </p>
+      )}
       {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
 
       {visibles.length === 0 && (
@@ -445,6 +491,17 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
           >
             Abrir original para guardar
           </a>
+          <button
+            className="boton chico"
+            style={{ color: "var(--peligro)" }}
+            disabled={cambiandoPortada}
+            onClick={(e) => {
+              e.stopPropagation();
+              quitarFotoVisor();
+            }}
+          >
+            Quitar esta foto
+          </button>
           <span style={{ color: "#fff", fontSize: "0.8rem", opacity: 0.7 }}>Toca fuera para cerrar</span>
         </div>
       )}

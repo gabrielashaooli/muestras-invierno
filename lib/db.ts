@@ -65,6 +65,13 @@ async function crearTablas() {
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1`;
   // Respaldo de los datos anteriores cada vez que se reemplazan o editan (nada se pierde).
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS respaldo JSONB NOT NULL DEFAULT '[]'::jsonb`;
+  // Fotos quitadas por la persona: salen de la muestra pero se conservan aquí.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS fotos_quitadas JSONB NOT NULL DEFAULT '[]'::jsonb`;
+  // Origen de la muestra ("ticket" si se creó desde un ticket) y si ya se completó automáticamente.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT ''`;
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS auto_revisado BOOLEAN NOT NULL DEFAULT false`;
+  // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
+  await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;
   await sql`CREATE INDEX IF NOT EXISTS key_items_dept_idx ON key_items (dept)`;
 }

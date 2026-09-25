@@ -35,6 +35,8 @@ export interface Muestra {
   fuentes: Fuente[];
   fotos: string[]; // fotos de etiquetas
   fotos_prenda: string[]; // fotos de la prenda (puesta / en modelo)
+  origen?: string; // "ticket" si se creó desde un ticket
+  auto_revisado?: boolean; // ya se completó automáticamente con Claude
   creado_en: string;
 }
 

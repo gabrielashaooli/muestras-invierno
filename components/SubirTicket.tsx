@@ -97,14 +97,22 @@ export default function SubirTicket({
       );
       if (!r) return;
 
-      // Buscar foto en internet para las que no tienen foto de prenda.
+      // Nuevas: descripción clara + datos + foto (con búsqueda en internet).
+      // Existentes sin foto de prenda: solo se busca la foto.
       let conFoto = 0;
       let sinFoto = 0;
+      for (let i = 0; i < r.creadas.length; i++) {
+        setAvance(`Completando datos y fotos ${i + 1} de ${r.creadas.length}…`);
+        try {
+          const m = await api<Muestra>(`/api/samples/${r.creadas[i]}/completar`, { method: "POST" });
+          if (m.fotos_prenda?.length) conFoto++;
+          else sinFoto++;
+        } catch {
+          sinFoto++;
+        }
+      }
       if (buscarFotos) {
-        const sinPrenda = [
-          ...r.creadas,
-          ...r.actualizadas.filter((id) => !(muestras.find((m) => m.id === id)?.fotos_prenda ?? []).length),
-        ];
+        const sinPrenda = r.actualizadas.filter((id) => !(muestras.find((m) => m.id === id)?.fotos_prenda ?? []).length);
         for (let i = 0; i < sinPrenda.length; i++) {
           setAvance(`Buscando fotos en internet ${i + 1} de ${sinPrenda.length}…`);
           try {
@@ -121,8 +129,8 @@ export default function SubirTicket({
         [
           r.actualizadas.length && `${r.actualizadas.length} muestra(s) marcadas como compradas`,
           r.creadas.length && `${r.creadas.length} muestra(s) nuevas creadas`,
-          buscarFotos && conFoto && `${conFoto} foto(s) encontradas en internet`,
-          buscarFotos && sinFoto && `${sinFoto} sin foto (puedes tomarla tú desde ⋯)`,
+          conFoto && `${conFoto} foto(s) encontradas en internet`,
+          sinFoto && `${sinFoto} sin foto (puedes tomarla tú desde ⋯)`,
         ]
           .filter(Boolean)
           .join(". ") + ".",

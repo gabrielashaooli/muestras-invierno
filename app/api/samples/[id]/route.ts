@@ -51,6 +51,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json(normalizarMuestra(filas[0]));
   }
 
+  // { quitar_foto: url } — quita una foto de la muestra. No se borra: queda en "fotos_quitadas".
+  if (typeof c?.quitar_foto === "string") {
+    const [m] = (await sql`SELECT fotos, fotos_prenda, fotos_quitadas FROM samples WHERE id = ${id}`) as {
+      fotos: string[];
+      fotos_prenda: string[];
+      fotos_quitadas: string[];
+    }[];
+    if (!m) return errorJson("No existe la muestra", 404);
+    const url = c.quitar_foto;
+    if (![...(m.fotos ?? []), ...(m.fotos_prenda ?? [])].includes(url)) return errorJson("Esa foto no es de esta muestra");
+    const filas = (await sql`
+      UPDATE samples SET
+        fotos = ${JSON.stringify((m.fotos ?? []).filter((f) => f !== url))}::jsonb,
+        fotos_prenda = ${JSON.stringify((m.fotos_prenda ?? []).filter((f) => f !== url))}::jsonb,
+        fotos_quitadas = ${JSON.stringify([...(m.fotos_quitadas ?? []), url])}::jsonb
+      WHERE id = ${id}
+      RETURNING *`) as Record<string, unknown>[];
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
+
   // { cantidad } — cambia solo la cantidad de piezas.
   if (c?.cantidad !== undefined) {
     const filas = (await sql`UPDATE samples SET cantidad = ${cantidadValida(c.cantidad)} WHERE id = ${id} RETURNING *`) as Record<string, unknown>[];

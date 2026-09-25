@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, NoAutorizado } from "@/lib/api";
 import type { KeyItem, Muestra } from "@/lib/tipos";
 import Capturar from "@/components/Capturar";
@@ -52,6 +52,30 @@ export default function Inicio() {
     }
   }, [conSesion]);
 
+  // Muestras creadas desde un ticket que aún no se completan: la app las arregla sola
+  // (descripción clara, datos y foto), una por una, sin que la persona tenga que tocar nada.
+  const [completando, setCompletando] = useState("");
+  const enProceso = useRef(false);
+  useEffect(() => {
+    const pendientes = muestras.filter((m) => m.origen === "ticket" && !m.auto_revisado);
+    if (enProceso.current || pendientes.length === 0) return;
+    enProceso.current = true;
+    (async () => {
+      for (let i = 0; i < pendientes.length; i++) {
+        setCompletando(`Completando datos del ticket ${i + 1} de ${pendientes.length}…`);
+        try {
+          await api(`/api/samples/${pendientes[i].id}/completar`, { method: "POST" });
+        } catch (e) {
+          console.error("No se pudo completar", pendientes[i].id, e);
+          if (e instanceof NoAutorizado) break;
+        }
+      }
+      setCompletando("");
+      enProceso.current = false;
+      await recargar();
+    })();
+  }, [muestras, recargar]);
+
   useEffect(() => {
     api<{ ok: boolean }>("/api/auth")
       .then((r) => setSesion(r.ok ? "ok" : "pendiente"))
@@ -79,6 +103,11 @@ export default function Inicio() {
         </header>
 
         {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
+        {completando && (
+          <div className="estado" style={{ marginTop: 0, marginBottom: 12 }}>
+            <span className="girando" /> {completando}
+          </div>
+        )}
 
         {pestana === "capturar" && (
           <Capturar keyItems={keyItems} conSesion={conSesion} alGuardar={recargar} />

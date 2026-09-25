@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
     }
     const dept = esDepartamento(r.dept) ? r.dept : "Mujer";
     const [nueva] = (await sql`
-      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, notas)
-      VALUES (${dept}, 'comprado', ${descripcion}, ${tienda}, ${precioDe(r)}, ${cantidad}, ${codigo}, ${"Creada desde ticket"})
+      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, origen)
+      VALUES (${dept}, 'comprado', ${descripcion}, ${tienda}, ${precioDe(r)}, ${cantidad}, ${codigo}, 'ticket')
       RETURNING id`) as { id: number }[];
     creadas.push(nueva.id);
     existentes.push({ id: nueva.id, codigo, estilo: "", descripcion });
