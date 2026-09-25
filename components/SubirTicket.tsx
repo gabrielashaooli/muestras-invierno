@@ -129,18 +129,32 @@ export default function SubirTicket({
   async function leerTexto() {
     const leidos: Renglon[] = [];
     for (const linea of texto.split(/\n+/)) {
-      if (/regular price|subtotal|total|tax|payment|change/i.test(linea)) continue;
-      const m = linea.trim().match(/^(\d{6,14})?\s*(.*?)\s*(?:[A-Z]\s+)?\$?\s*(\d+(?:[.,]\d{1,2})?)$/);
-      if (!m || (!m[1] && !m[2])) continue;
-      const i = leidos.length;
+      if (/regular price|subtotal|total|tax|payment|change|tend/i.test(linea)) continue;
+      // Acepta "código nombre precio" o "nombre código precio N" (Walmart).
+      const sinMarca = linea.trim().replace(/\s+[A-Z]$/, "");
+      const precio = sinMarca.match(/\$?\s*(\d+(?:[.,]\d{1,2})?)$/);
+      if (!precio) continue;
+      // En Target la "N" va antes del "$precio"; sin "$" la letra es parte del nombre (talla o color).
+      let resto = sinMarca.slice(0, precio.index).trim();
+      if (precio[0].startsWith("$")) resto = resto.replace(/\s+[A-Z]$/, "");
+      const codigo = resto.match(/\b\d{6,14}\b/)?.[0] ?? "";
+      const descripcion = resto.replace(codigo, "").replace(/\s+/g, " ").trim();
+      if (!codigo && !descripcion) continue;
+      const valor = Number(precio[1].replace(",", ".")) || null;
+      // El mismo código dos veces es la misma prenda: se suman las piezas.
+      const igual = codigo && leidos.find((x) => x.codigo === codigo && x.precio === valor);
+      if (igual) {
+        igual.cantidad++;
+        continue;
+      }
       leidos.push({
-        descripcion: m[2].trim(),
-        codigo: m[1] ?? "",
-        precio: Number(m[3].replace(",", ".")) || null,
+        descripcion,
+        codigo,
+        precio: valor,
         cantidad: 1,
         estilo: "",
         color: "",
-        grupo: `u:${m[1] || m[2]}|${i}`,
+        grupo: `u:${codigo || descripcion}|${leidos.length}`,
         muestraId: null,
         coincidencia: null,
       });

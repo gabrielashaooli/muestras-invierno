@@ -142,7 +142,10 @@ export function emparejar(renglones: RenglonTicket[], muestras: MuestraParaTicke
   }
   for (const r of renglones) {
     if (r.muestraId !== null) continue;
-    const hermano = renglones.find((x) => x !== r && x.grupo === r.grupo && x.muestraId !== null);
+    // Otro color de la misma prenda, o el mismo código repetido en el ticket (2 piezas en renglones separados).
+    const hermano = renglones.find(
+      (x) => x !== r && x.muestraId !== null && (x.grupo === r.grupo || (r.codigo.length >= 6 && x.codigo === r.codigo)),
+    );
     if (hermano) {
       r.muestraId = hermano.muestraId;
       r.coincidencia = "grupo";
