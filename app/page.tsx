@@ -75,17 +75,30 @@ export default function Inicio() {
   // (descripción clara, datos y foto), una por una, sin que la persona tenga que tocar nada.
   const [completando, setCompletando] = useState("");
   const enProceso = useRef(false);
+  const intentadas = useRef(new Set<number>()); // cada muestra se intenta una sola vez por sesión
   useEffect(() => {
-    const pendientes = muestras.filter((m) => m.origen === "ticket" && !m.auto_revisado);
+    // 1) Creadas desde ticket: descripción clara, datos y foto.
+    // 2) Con fotos pero sin descripción o sin código: Claude lee su etiqueta (así el ticket las reconoce).
+    //    Solo se llenan campos vacíos; las fotos no se tocan.
+    const pendientes = muestras.filter(
+      (m) =>
+        !m.auto_revisado &&
+        !intentadas.current.has(m.id) &&
+        (m.origen === "ticket" ||
+          ((m.fotos.length + (m.fotos_prenda?.length ?? 0)) > 0 && (!m.descripcion?.trim() || !m.codigo?.trim()))),
+    );
     if (enProceso.current || pendientes.length === 0) return;
     enProceso.current = true;
     (async () => {
       for (let i = 0; i < pendientes.length; i++) {
-        setCompletando(`Completando datos del ticket ${i + 1} de ${pendientes.length}…`);
+        setCompletando(`Completando datos que faltan ${i + 1} de ${pendientes.length}…`);
+        const m = pendientes[i];
+        intentadas.current.add(m.id);
         try {
-          await api(`/api/samples/${pendientes[i].id}/completar`, { method: "POST" });
+          if (m.origen === "ticket") await api(`/api/samples/${m.id}/completar`, { method: "POST" });
+          else await api(`/api/samples/${m.id}/analizar`, { method: "POST", body: JSON.stringify({ modo: "llenar" }) });
         } catch (e) {
-          console.error("No se pudo completar", pendientes[i].id, e);
+          console.error("No se pudo completar", m.id, e);
           if (e instanceof NoAutorizado) break;
         }
       }

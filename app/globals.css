@@ -2082,3 +2082,94 @@ body {
   min-height: 0;
   display: block;
 }
+
+/* Ticket: elegir muestra con fotos */
+.elegida-ticket {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.elegida-ticket img,
+.elegida-ticket .sin-foto {
+  width: 44px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--superficie-2);
+  flex: 0 0 auto;
+}
+
+.elegida-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+
+.elegida-texto strong,
+.elegida-texto span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.elegida-texto span {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+
+.hoja.hoja-editar .elegida-ticket .boton,
+.hoja.hoja-editar .elegir-ticket .boton {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.tira-ticket {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.hoja.hoja-editar .opcion-ticket {
+  flex: 0 0 auto;
+  width: 78px;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.hoja.hoja-editar .opcion-ticket.activa {
+  border-color: var(--primario);
+}
+
+.opcion-ticket img,
+.opcion-ticket .sin-foto {
+  width: 100%;
+  height: 96px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--superficie-2);
+  display: block;
+}
+
+.opcion-ticket span:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.2;
+}

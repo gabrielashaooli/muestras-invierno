@@ -47,12 +47,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       console.error("No se pudo leer la foto", url, e);
     }
   }
-  if (imagenes.length === 0) return errorJson("No se pudieron leer las fotos de esta muestra");
+  if (imagenes.length === 0) {
+    await sql`UPDATE samples SET auto_revisado = true WHERE id = ${id}`;
+    return errorJson("No se pudieron leer las fotos de esta muestra");
+  }
 
   let r;
   try {
     r = await analizarImagenes(imagenes, esDepartamento(m.dept) ? m.dept : null);
   } catch (e) {
+    // Si falla (salvo por exceso de solicitudes), se marca revisada para no reintentar en automático.
+    if (!(e instanceof ErrorAnalisis && e.estado === 429)) {
+      await sql`UPDATE samples SET auto_revisado = true WHERE id = ${id}`;
+    }
     if (e instanceof ErrorAnalisis) return errorJson(e.message, e.estado);
     throw e;
   }
@@ -77,7 +84,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         key_item_id = ${r.keyItemId ?? (vacio(m.key_item_id) ? null : Number(m.key_item_id))},
         notas = ${r.notas},
         fuentes = ${JSON.stringify([...fuentes.values()])}::jsonb,
-        respaldo = ${JSON.stringify(respaldo)}::jsonb
+        respaldo = ${JSON.stringify(respaldo)}::jsonb,
+        auto_revisado = true
       WHERE id = ${id}
       RETURNING *`) as Record<string, unknown>[];
     return NextResponse.json(normalizarMuestra(filas[0]));
@@ -97,7 +105,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       estilo = ${elegir(m.estilo, r.estilo)},
       key_item_id = ${vacio(m.key_item_id) ? r.keyItemId : Number(m.key_item_id)},
       notas = ${elegir(m.notas, r.notas)},
-      fuentes = ${JSON.stringify([...fuentes.values()])}::jsonb
+      fuentes = ${JSON.stringify([...fuentes.values()])}::jsonb,
+      auto_revisado = true
     WHERE id = ${id}
     RETURNING *`) as Record<string, unknown>[];
   return NextResponse.json(normalizarMuestra(filas[0]));

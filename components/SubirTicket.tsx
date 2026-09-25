@@ -59,6 +59,26 @@ export default function SubirTicket({
     try {
       // Más resolución que las fotos normales para que se lean los renglones.
       const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirImagen(a, 2400))));
+
+      // Antes de comparar: las muestras con fotos pero sin descripción o sin código se completan leyendo
+      // su etiqueta (así el ticket las reconoce). Solo se llenan campos vacíos; las fotos no se tocan.
+      const incompletas = muestras.filter(
+        (m) =>
+          !m.auto_revisado &&
+          m.origen !== "ticket" &&
+          m.fotos.length + (m.fotos_prenda?.length ?? 0) > 0 &&
+          (!m.descripcion?.trim() || !m.codigo?.trim()),
+      );
+      for (let i = 0; i < incompletas.length; i++) {
+        setAvance(`Preparando tus muestras ${i + 1} de ${incompletas.length}…`);
+        try {
+          await api(`/api/samples/${incompletas[i].id}/analizar`, { method: "POST", body: JSON.stringify({ modo: "llenar" }) });
+        } catch {
+          /* se sigue */
+        }
+      }
+      if (incompletas.length) await alCambiar();
+      setAvance("");
       const r = await conSesion(() =>
         api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes, coleccion_id: coleccionId }) }),
       );
@@ -151,12 +171,20 @@ export default function SubirTicket({
     }
   }
 
-  const etiquetaMuestra = (m: Muestra) =>
-    [m.marca, m.descripcion || "Sin descripción", m.talla && `T. ${m.talla}`, m.precio_usd !== null && usd.format(m.precio_usd)]
-      .filter(Boolean)
-      .join(" · ");
-
   const hayNuevas = acciones.some((a) => a === "crear");
+
+  // Muestras sugeridas para un renglón: primero las de la misma tienda que no se han ligado ni comprado.
+  const claveTienda = tienda.toLowerCase().split(/\s+/)[0] ?? "";
+  function candidatas(r: Renglon, i: number) {
+    const usadas = new Set(acciones.filter((a, j) => j !== i && a.startsWith("m")));
+    const palabras = r.descripcion.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+    const puntos = (m: Muestra) =>
+      (claveTienda && (m.tienda ?? "").toLowerCase().includes(claveTienda) ? 100 : 0) +
+      (m.status !== "comprado" ? 20 : 0) +
+      (m.precio_usd !== null && r.precio !== null && Math.abs(m.precio_usd - r.precio) < 0.01 ? 30 : 0) +
+      palabras.filter((w) => `${m.descripcion} ${m.marca}`.toLowerCase().includes(w)).length * 5;
+    return muestras.filter((m) => !usadas.has(`m${m.id}`)).sort((a, b) => puntos(b) - puntos(a));
+  }
 
   return (
     <div className="hoja-fondo" onClick={paso === "aplicando" || paso === "leyendo" ? undefined : alCerrar}>
@@ -184,7 +212,7 @@ export default function SubirTicket({
         )}
 
         {paso === "leyendo" && (
-          <div className="estado"><span className="girando" /> Leyendo ticket…</div>
+          <div className="estado"><span className="girando" /> {avance || "Leyendo ticket…"}</div>
         )}
 
         {paso === "revisar" && (
@@ -206,20 +234,12 @@ export default function SubirTicket({
                 {(r.codigo || r.color) && (
                   <div className="pequeno">{[r.color && `Color ${r.color}`, r.codigo && `Código ${r.codigo}`].filter(Boolean).join(" · ")}</div>
                 )}
-                <select
-                  value={acciones[i]}
-                  onChange={(e) => setAcciones((a) => a.map((x, j) => (j === i ? (e.target.value as Accion) : x)))}
-                >
-                  <option value="crear">➕ Crear muestra nueva</option>
-                  <option value="ignorar">No es muestra (ignorar)</option>
-                  <optgroup label="Ligar con muestra">
-                    {muestras.map((m) => (
-                      <option key={m.id} value={`m${m.id}`}>
-                        {etiquetaMuestra(m)}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
+                <Elegir
+                  accion={acciones[i]}
+                  candidatas={candidatas(r, i)}
+                  elegida={acciones[i].startsWith("m") ? muestras.find((m) => `m${m.id}` === acciones[i]) : undefined}
+                  alCambiar={(nueva) => setAcciones((a) => a.map((x, j) => (j === i ? nueva : x)))}
+                />
                 {(acciones[i].startsWith("m")
                   ? acciones.filter((x) => x === acciones[i]).length > 1
                   : acciones[i] === "crear" &&
@@ -270,6 +290,76 @@ export default function SubirTicket({
         )}
 
         {error && <div className="estado error">{error}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Selector visual: la muestra elegida con su foto, o fotos de tus muestras para tocar la que es.
+function Elegir({
+  accion,
+  candidatas,
+  elegida,
+  alCambiar,
+}: {
+  accion: Accion;
+  candidatas: Muestra[];
+  elegida?: Muestra;
+  alCambiar: (a: Accion) => void;
+}) {
+  const [abierto, setAbierto] = useState(accion === "crear");
+  const foto = (m: Muestra) => m.fotos_prenda?.[0] ?? m.fotos[0];
+
+  if (elegida && !abierto) {
+    return (
+      <div className="elegida-ticket">
+        {foto(elegida) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={foto(elegida)} alt="" />
+        ) : (
+          <span className="sin-foto" />
+        )}
+        <div className="elegida-texto">
+          <strong>{elegida.descripcion || "Sin descripción"}</strong>
+          <span>{[elegida.marca, elegida.talla && `T. ${elegida.talla}`].filter(Boolean).join(" · ")}</span>
+        </div>
+        <button className="boton chico" onClick={() => setAbierto(true)}>Cambiar</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="elegir-ticket">
+      <div className="pequeno" style={{ margin: "2px 0 6px" }}>
+        {accion === "ignorar" ? "Se ignora este renglón." : "¿Es alguna de tus muestras? Tócala:"}
+      </div>
+      <div className="tira-ticket">
+        {candidatas.slice(0, 30).map((m) => (
+          <button
+            key={m.id}
+            className={`opcion-ticket${accion === `m${m.id}` ? " activa" : ""}`}
+            onClick={() => {
+              alCambiar(`m${m.id}` as Accion);
+              setAbierto(false);
+            }}
+          >
+            {foto(m) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={foto(m)} alt="" loading="lazy" />
+            ) : (
+              <span className="sin-foto" />
+            )}
+            <span>{m.descripcion || m.marca || "Sin nombre"}</span>
+          </button>
+        ))}
+      </div>
+      <div className="fila" style={{ gap: 8, marginTop: 8 }}>
+        <button className={`boton chico${accion === "crear" ? " primario" : ""}`} onClick={() => alCambiar("crear")}>
+          Es nueva
+        </button>
+        <button className={`boton chico${accion === "ignorar" ? " primario" : ""}`} onClick={() => alCambiar("ignorar")}>
+          No es muestra
+        </button>
       </div>
     </div>
   );
