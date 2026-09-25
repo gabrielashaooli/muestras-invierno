@@ -35,7 +35,7 @@ async function decodificar(archivo: File): Promise<{ fuente: CanvasImageSource; 
 }
 
 // Reduce la foto a 1400 px en su lado mayor y la recomprime a JPEG 0.78.
-export async function comprimirImagen(archivo: File): Promise<Blob> {
+export async function comprimirImagen(archivo: File, ladoMax = LADO_MAXIMO): Promise<Blob> {
   let imagen: Awaited<ReturnType<typeof decodificar>>;
   try {
     imagen = await decodificar(archivo);
@@ -44,7 +44,7 @@ export async function comprimirImagen(archivo: File): Promise<Blob> {
     if (/^image\/(jpeg|png)$/.test(archivo.type) && archivo.size < 3.5 * 1024 * 1024) return archivo;
     throw e;
   }
-  const escala = Math.min(1, LADO_MAXIMO / Math.max(imagen.ancho, imagen.alto));
+  const escala = Math.min(1, ladoMax / Math.max(imagen.ancho, imagen.alto));
   const ancho = Math.max(1, Math.round(imagen.ancho * escala));
   const alto = Math.max(1, Math.round(imagen.alto * escala));
 

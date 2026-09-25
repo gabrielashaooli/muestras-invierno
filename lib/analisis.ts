@@ -134,23 +134,50 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
       : "No hay key items registrados; usa keyItemId null.",
   ].join("\n");
 
-  const cliente = new Anthropic();
-  const herramientas: Anthropic.ToolUnion[] = [
-    { type: "web_search_20250305", name: "web_search", max_uses: 4 },
-  ];
-  const mensajes: Anthropic.MessageParam[] = [
-    {
-      role: "user",
-      content: [
-        ...imagenes.flatMap((img, i): Anthropic.ContentBlockParam[] => [
-          { type: "text", text: `Foto ${i}:` },
-          { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
-        ]),
-        { type: "text", text: `${contexto}\n\nAnaliza la prenda y responde solo con el JSON.` },
-      ],
-    },
-  ];
+  const { datos, fuentes } = await consultarClaude(INSTRUCCIONES, [
+    ...imagenes.flatMap((img, i): Anthropic.ContentBlockParam[] => [
+      { type: "text", text: `Foto ${i}:` },
+      { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
+    ]),
+    { type: "text", text: `${contexto}\n\nAnaliza la prenda y responde solo con el JSON.` },
+  ]);
 
+  const idSugerido = Number(datos.keyItemId);
+  const resultado: Analisis = {
+    desc: cadena(datos.desc),
+    marca: cadena(datos.marca),
+    precio: precioSeguro(datos.precio),
+    talla: cadena(datos.talla),
+    color: cadena(datos.color),
+    tela: cadena(datos.tela),
+    estilo: cadena(datos.estilo),
+    codigo: cadena(datos.codigo),
+    dept: esDepartamento(datos.dept) ? datos.dept : "",
+    keyItemId: keyItems.some((k) => k.id === idSugerido) ? idSugerido : null,
+    notas: typeof datos.notas === "string" ? datos.notas.trim() : "",
+    confianza: cadena(datos.confianza),
+    fotoPrenda:
+      Number.isInteger(datos.fotoPrenda) && (datos.fotoPrenda as number) >= 0 && (datos.fotoPrenda as number) < imagenes.length
+        ? (datos.fotoPrenda as number)
+        : null,
+    fuentes,
+  };
+  return resultado;
+}
+
+// Llama a Claude con búsqueda web y devuelve el JSON de la respuesta y las fuentes consultadas.
+// Maneja pause_turn reenviando el mensaje del assistant sin modificar (máximo 5 vueltas).
+export async function consultarClaude(
+  sistema: string,
+  contenido: Anthropic.ContentBlockParam[],
+  busquedas = 4,
+): Promise<{ datos: Record<string, unknown>; fuentes: Fuente[] }> {
+  if (!process.env.ANTHROPIC_API_KEY) throw new ErrorAnalisis("Falta ANTHROPIC_API_KEY", 500);
+  const cliente = new Anthropic();
+  // Sin búsquedas (ej. leer un ticket) no se manda la herramienta.
+  const herramientas: Anthropic.ToolUnion[] =
+    busquedas > 0 ? [{ type: "web_search_20250305", name: "web_search", max_uses: busquedas }] : [];
+  const mensajes: Anthropic.MessageParam[] = [{ role: "user", content: contenido }];
   const fuentes = new Map<string, Fuente>();
   let respuesta: Anthropic.Message;
 
@@ -158,7 +185,7 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
     respuesta = await cliente.messages.create({
       model: MODELO,
       max_tokens: 16000,
-      system: INSTRUCCIONES,
+      system: sistema,
       tools: herramientas,
       messages: mensajes,
     });
@@ -171,7 +198,7 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
       respuesta = await cliente.messages.create({
         model: MODELO,
         max_tokens: 16000,
-        system: INSTRUCCIONES,
+        system: sistema,
         tools: herramientas,
         messages: mensajes,
       });
@@ -198,26 +225,5 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
     console.error("Respuesta sin JSON", respuesta.stop_reason, textoFinal.slice(0, 500));
     throw new ErrorAnalisis("No se pudo interpretar la respuesta de Claude", 502);
   }
-
-  const idSugerido = Number(datos.keyItemId);
-  const resultado: Analisis = {
-    desc: cadena(datos.desc),
-    marca: cadena(datos.marca),
-    precio: precioSeguro(datos.precio),
-    talla: cadena(datos.talla),
-    color: cadena(datos.color),
-    tela: cadena(datos.tela),
-    estilo: cadena(datos.estilo),
-    codigo: cadena(datos.codigo),
-    dept: esDepartamento(datos.dept) ? datos.dept : "",
-    keyItemId: keyItems.some((k) => k.id === idSugerido) ? idSugerido : null,
-    notas: typeof datos.notas === "string" ? datos.notas.trim() : "",
-    confianza: cadena(datos.confianza),
-    fotoPrenda:
-      Number.isInteger(datos.fotoPrenda) && (datos.fotoPrenda as number) >= 0 && (datos.fotoPrenda as number) < imagenes.length
-        ? (datos.fotoPrenda as number)
-        : null,
-    fuentes: [...fuentes.values()],
-  };
-  return resultado;
+  return { datos, fuentes: [...fuentes.values()] };
 }

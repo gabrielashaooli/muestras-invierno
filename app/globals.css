@@ -1329,3 +1329,51 @@ details summary {
   width: auto;
   padding: 8px 12px;
 }
+
+/* Subir ticket */
+.renglon-ticket {
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.renglon-cabeza {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.renglon-cabeza span {
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.renglon-ticket select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: var(--fondo);
+  font-size: 16px;
+}
+
+.casilla-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.casilla-check input {
+  width: 22px;
+  height: 22px;
+}

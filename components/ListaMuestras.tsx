@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { comprimirImagen } from "@/lib/imagen";
 import type { Departamento, KeyItem, Muestra } from "@/lib/tipos";
 import EditarMuestra from "./EditarMuestra";
+import SubirTicket from "./SubirTicket";
 import FiltroDept from "./FiltroDept";
 import { IconoBasura, IconoCamara, IconoPrenda } from "./Iconos";
 import Cantidad from "./Cantidad";
@@ -59,6 +60,22 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
   }
 
   const [editando, setEditando] = useState<Muestra | null>(null);
+  const [ticket, setTicket] = useState(false);
+  const [buscandoFotoEn, setBuscandoFotoEn] = useState<number | null>(null);
+
+  // Busca en internet la foto de la prenda (para las que no tienen).
+  async function buscarFoto(m: Muestra) {
+    setBuscandoFotoEn(m.id);
+    setError("");
+    try {
+      await conSesion(() => api(`/api/samples/${m.id}/buscar-foto`, { method: "POST" }));
+      await alCambiar();
+    } catch (e) {
+      setError(`${(e as Error).message}. Puedes tomarla tú desde ⋯ → Agregar foto de prenda.`);
+    } finally {
+      setBuscandoFotoEn(null);
+    }
+  }
 
   // Vuelve a analizar con Claude las fotos guardadas.
   // "llenar": solo lo vacío. "reemplazar": revisa desde cero (lo anterior queda respaldado).
@@ -154,6 +171,9 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
     <>
       {/* Sin "capture": en iPhone ofrece tomar foto o elegir de la galería */}
       <input ref={entradaFoto} className="oculto" type="file" accept="image/*" onChange={alElegirFoto} />
+      <button className="boton ancho" style={{ marginBottom: 14 }} onClick={() => setTicket(true)}>
+        🧾 Subir ticket de compra
+      </button>
       <FiltroDept valor={filtro} alCambiar={setFiltro} />
       {error && <div className="estado error" style={{ marginBottom: 12 }}>{error}</div>}
 
@@ -249,6 +269,8 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
                 <span className="pequeno">
                   {analizandoEn === m.id ? (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span className="girando" /> Analizando…</span>
+                  ) : buscandoFotoEn === m.id ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span className="girando" /> Buscando foto…</span>
                   ) : subiendoEn === m.id ? (
                     "Subiendo foto…"
                   ) : borrando === m.id ? (
@@ -314,6 +336,20 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
             >
               {menu.fotos_prenda?.[0] ? "Cambiar foto de prenda" : "Agregar foto de prenda"}
             </button>
+            {!menu.fotos_prenda?.[0] && (
+              <button
+                role="menuitem"
+                disabled={buscandoFotoEn !== null}
+                onClick={() => {
+                  const m = menu;
+                  setMenu(null);
+                  buscarFoto(m);
+                }}
+              >
+                Buscar foto en internet
+                <small>Con la marca, descripción y código</small>
+              </button>
+            )}
             {[...(menu.fotos_prenda ?? []), ...menu.fotos].length > 0 && (
               <button
                 role="menuitem"
@@ -340,6 +376,10 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
             <button className="cancelar" onClick={() => setMenu(null)}>Cancelar</button>
           </div>
         </div>
+      )}
+
+      {ticket && (
+        <SubirTicket muestras={muestras} conSesion={conSesion} alCerrar={() => setTicket(false)} alCambiar={alCambiar} />
       )}
 
       {editando && (
