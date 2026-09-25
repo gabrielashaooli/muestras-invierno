@@ -100,7 +100,7 @@ export default function Inicio() {
           if (m.origen === "ticket") await api(`/api/samples/${m.id}/completar`, { method: "POST" });
           else await api(`/api/samples/${m.id}/analizar`, { method: "POST", body: JSON.stringify({ modo: "llenar" }) });
         } catch (e) {
-          if (e instanceof NoAutorizado) break;
+          if (e instanceof NoAutorizado || /créditos/.test((e as Error).message)) break;
         }
       }
       setCompletando("");

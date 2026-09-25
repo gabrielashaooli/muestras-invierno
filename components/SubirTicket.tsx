@@ -38,7 +38,7 @@ export default function SubirTicket({
   alCerrar: () => void;
   alCambiar: () => Promise<void>;
 }) {
-  const [paso, setPaso] = useState<"elegir" | "leyendo" | "revisar" | "aplicando" | "listo">("elegir");
+  const [paso, setPaso] = useState<"elegir" | "texto" | "leyendo" | "revisar" | "aplicando" | "listo">("elegir");
   const [tienda, setTienda] = useState("");
   const [fecha, setFecha] = useState("");
   const [renglones, setRenglones] = useState<Renglon[]>([]);
@@ -122,6 +122,54 @@ export default function SubirTicket({
     }
   }
 
+  // Sin créditos de Claude: el texto del ticket se pega o escribe ("032130078 Cat & Jack 18.00") y se liga
+  // con tus muestras por código. No usa Claude.
+  const [texto, setTexto] = useState("");
+  const [tiendaTexto, setTiendaTexto] = useState("Target");
+  async function leerTexto() {
+    const leidos: Renglon[] = [];
+    for (const linea of texto.split(/\n+/)) {
+      if (/regular price|subtotal|total|tax|payment|change/i.test(linea)) continue;
+      const m = linea.trim().match(/^(\d{6,14})?\s*(.*?)\s*(?:[A-Z]\s+)?\$?\s*(\d+(?:[.,]\d{1,2})?)$/);
+      if (!m || (!m[1] && !m[2])) continue;
+      const i = leidos.length;
+      leidos.push({
+        descripcion: m[2].trim(),
+        codigo: m[1] ?? "",
+        precio: Number(m[3].replace(",", ".")) || null,
+        cantidad: 1,
+        estilo: "",
+        color: "",
+        grupo: `u:${m[1] || m[2]}|${i}`,
+        muestraId: null,
+        coincidencia: null,
+      });
+    }
+    if (!leidos.length) {
+      setError("No encontré artículos. Pon uno por renglón: código, nombre y precio.");
+      return;
+    }
+    setError("");
+    setPaso("leyendo");
+    try {
+      const e = await conSesion(() =>
+        api<{ renglones: Renglon[] }>("/api/ticket/emparejar", {
+          method: "POST",
+          body: JSON.stringify({ renglones: leidos, coleccion_id: coleccionId }),
+        }),
+      );
+      if (!e) return;
+      setTienda(tiendaTexto.trim());
+      setFecha("");
+      setRenglones(e.renglones);
+      setAcciones(e.renglones.map((x) => (x.muestraId ? (`m${x.muestraId}` as Accion) : "crear")));
+      setPaso("revisar");
+    } catch (err) {
+      setError(`No se pudo revisar: ${(err as Error).message}`);
+      setPaso("texto");
+    }
+  }
+
   async function aplicar() {
     setPaso("aplicando");
     setError("");
@@ -168,8 +216,8 @@ export default function SubirTicket({
             body: JSON.stringify({ texto_ticket: textoDe.get(id) ?? "" }),
           });
           if (!antes && m.fotos_prenda?.length) conFoto++;
-        } catch {
-          /* se sigue con las demás */
+        } catch (e) {
+          if (/créditos/.test((e as Error).message)) break; // sin créditos: lo demás ya quedó guardado
         }
       }
 
@@ -222,6 +270,34 @@ export default function SubirTicket({
               </button>
               <button className="boton" onClick={() => galeria.current?.click()}>
                 <IconoGaleria /> Galería
+              </button>
+            </div>
+            <button className="boton ancho" style={{ marginTop: 10 }} onClick={() => setPaso("texto")}>
+              Escribir o pegar el ticket (sin créditos)
+            </button>
+          </>
+        )}
+
+        {paso === "texto" && (
+          <>
+            <p className="pequeno" style={{ margin: "0 4px 8px" }}>
+              Un artículo por renglón: código, nombre y precio. Ej. <strong>032130078 Cat &amp; Jack 18.00</strong>. No usa créditos.
+            </p>
+            <div className="campo">
+              <label>Tienda</label>
+              <input value={tiendaTexto} onChange={(e) => setTiendaTexto(e.target.value)} />
+            </div>
+            <textarea
+              className="texto-ticket"
+              rows={12}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder={"032130078 Cat & Jack 18.00\n333030489 Art Class 20.00"}
+            />
+            <div className="barra-aplicar">
+              <button className="boton" onClick={() => setPaso("elegir")}>Atrás</button>
+              <button className="boton primario" style={{ flex: 1 }} onClick={leerTexto} disabled={!texto.trim()}>
+                Revisar
               </button>
             </div>
           </>

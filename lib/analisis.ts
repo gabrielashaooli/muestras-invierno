@@ -15,6 +15,7 @@ export class ErrorAnalisis extends Error {
 const MODELO = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 const MAX_VUELTAS = 5; // máximo de reanudaciones por pause_turn
 export const MAX_IMAGENES = 6;
+export const SIN_CREDITOS = "Se acabaron los créditos de Claude. Recarga en console.anthropic.com → Billing.";
 
 export const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 export type TipoImagen = (typeof TIPOS_IMAGEN)[number];
@@ -210,6 +211,7 @@ export async function consultarClaude(
     if (e instanceof Anthropic.RateLimitError) throw new ErrorAnalisis("Demasiadas solicitudes a Claude, intenta en un momento", 429);
     if (e instanceof Anthropic.APIError) {
       console.error("Error de la API de Claude", e.status, e.message);
+      if (/credit balance|billing/i.test(e.message)) throw new ErrorAnalisis(SIN_CREDITOS, 402);
       throw new ErrorAnalisis(`Error de Claude: ${e.message}`, 502);
     }
     throw e;
