@@ -73,6 +73,8 @@ async function crearTablas() {
   // Renglón exacto del ticket que creó la muestra (tienda|fecha|renglón|código|precio): evita duplicar
   // si el mismo ticket se sube dos veces, sin juntar prendas distintas con el mismo código.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS ticket_linea TEXT NOT NULL DEFAULT ''`;
+  // Si la muestra se juntó con otra (repetida), aquí queda el id de la que se conservó.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS unida_a INTEGER`;
   // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
   await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;

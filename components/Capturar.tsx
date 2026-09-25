@@ -315,7 +315,7 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
     setGuardando(true);
     try {
       const r = await conSesion(() =>
-        api("/api/samples", {
+        api<{ unida?: boolean; descripcion?: string }>("/api/samples", {
           method: "POST",
           body: JSON.stringify({
             ...campos,
@@ -333,7 +333,12 @@ export default function Capturar({ keyItems, conSesion, alGuardar }: Props) {
       );
       if (!r) return;
       limpiar();
-      setMensaje({ tipo: "ok", texto: "Muestra guardada ✔" });
+      setMensaje({
+        tipo: "ok",
+        texto: r.unida
+          ? `Esta prenda ya estaba guardada (${r.descripcion || "mismo código"}): se juntó con esa, sin repetirla ✔`
+          : "Muestra guardada ✔",
+      });
       await alGuardar();
     } catch (e) {
       setMensaje({ tipo: "error", texto: `No se pudo guardar: ${(e as Error).message}` });

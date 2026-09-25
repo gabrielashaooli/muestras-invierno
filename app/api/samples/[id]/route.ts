@@ -51,6 +51,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json(normalizarMuestra(filas[0]));
   }
 
+  // { agregar_prenda: url } — agrega otra foto de prenda (ej. otro color) sin quitar las que ya tiene.
+  if (urlFotoValida(c?.agregar_prenda)) {
+    const filas = (await sql`
+      UPDATE samples SET fotos_prenda = fotos_prenda || ${JSON.stringify([c.agregar_prenda])}::jsonb
+      WHERE id = ${id}
+      RETURNING *`) as Record<string, unknown>[];
+    if (filas.length === 0) return errorJson("No existe la muestra", 404);
+    return NextResponse.json(normalizarMuestra(filas[0]));
+  }
+
   // { quitar_foto: url } — quita una foto de la muestra. No se borra: queda en "fotos_quitadas".
   if (typeof c?.quitar_foto === "string") {
     const [m] = (await sql`SELECT fotos, fotos_prenda, fotos_quitadas FROM samples WHERE id = ${id}`) as {

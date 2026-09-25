@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { consultarClaude, type Imagen } from "./analisis";
 import { parsePrecio } from "./precio";
 import { cantidadValida } from "./tipos";
+import { mismoCodigo } from "./codigos";
 
 // Lectura de tickets de compra y búsqueda de la muestra que corresponde a cada renglón.
 
@@ -34,8 +35,8 @@ Extrae cada artículo comprado. Ignora subtotales, impuestos (TAX), descuentos g
 Para cada artículo:
 - "descripcion": el texto del artículo tal cual (ej. "FA CABLE POLO").
 - "codigo": el número del artículo o UPC que aparece junto a él (solo dígitos), o "".
-- "estilo": el número de producto que comparten todos los colores y tallas de la misma prenda, o "".
-  (Ej. en Uniqlo el número de artículo trae producto + color + talla: el estilo son los primeros 6 dígitos.)
+- "estilo": SOLO si el ticket imprime explícitamente un número de estilo/producto aparte del código; si no, "".
+  Nunca lo inventes ni lo saques recortando el código (en muchas tiendas todos los códigos empiezan igual).
 - "color": el color si aparece en el ticket (en español), o "".
 - "precio": precio unitario en USD como número con punto (ej. "12.98"). Si hay descuento en ese renglón, el precio final. Si no se lee claro, "".
 - "cantidad": número de piezas (si dice "2 @ 9.98" son 2). Si no dice, 1.
@@ -45,18 +46,7 @@ Para cada artículo:
 No inventes renglones ni juntes renglones: un objeto por cada renglón del ticket. Responde SOLO con JSON:
 {"tienda":"","fecha":"","articulos":[{"descripcion":"","codigo":"","estilo":"","color":"","precio":"","cantidad":1,"muestraId":null}]}`;
 
-const digitos = (v: string) => v.replace(/\D/g, "").replace(/^0+/, "");
-
-// ¿El código del ticket corresponde al de la etiqueta? Los tickets a veces omiten el
-// dígito verificador del UPC o agregan ceros al inicio.
-export function mismoCodigo(a: string, b: string): boolean {
-  const x = digitos(a);
-  const y = digitos(b);
-  if (x.length < 6 || y.length < 6) return false;
-  if (x === y) return true;
-  if (x.slice(0, -1) === y || y.slice(0, -1) === x) return true;
-  return Math.min(x.length, y.length) >= 8 && (x.includes(y) || y.includes(x));
-}
+export { mismoCodigo } from "./codigos";
 
 export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket[]) {
   const lista = muestras
@@ -93,8 +83,13 @@ export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket
     const descripcion = String(a.descripcion ?? "").trim().slice(0, 200);
     const precio = parsePrecio(String(a.precio ?? ""));
     const precioOk = precio !== null && precio > 0 && precio < 10000 ? precio : null;
-    // Misma prenda en otro color: mismo estilo, o (si no hay estilo) mismo texto y mismo precio.
-    const grupo = estilo ? `e:${estilo.toLowerCase()}` : `d:${normal(descripcion)}|${precioOk ?? ""}`;
+    // Misma prenda en otro color: mismo texto y mismo precio en el ticket (ej. 2 "W's corduroy vest" de $69.90).
+    // Si el renglón no trae texto, se usa el estilo o el código.
+    const grupo = normal(descripcion)
+      ? `d:${normal(descripcion)}|${precioOk ?? ""}`
+      : estilo
+        ? `e:${estilo.toLowerCase()}`
+        : `c:${codigo || Math.random()}`;
 
     let muestraId: number | null = null;
     let coincidencia: RenglonTicket["coincidencia"] = null;
@@ -104,7 +99,7 @@ export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket
       (m) =>
         !usados.has(m.id) &&
         ((codigo && (mismoCodigo(codigo, m.codigo) || mismoCodigo(codigo, m.estilo))) ||
-          (estilo.length >= 5 && (mismoCodigo(estilo, m.estilo) || mismoCodigo(estilo, m.codigo)))),
+          (estilo.length >= 5 && mismoCodigo(estilo, m.estilo))),
     );
     if (porCodigo) {
       muestraId = porCodigo.id;

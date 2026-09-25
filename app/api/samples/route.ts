@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db, normalizarMuestra } from "@/lib/db";
 import { errorJson, texto } from "@/lib/respuestas";
 import { urlFotoValida } from "@/lib/blob";
+import { sonLaMisma } from "@/lib/duplicados";
+import { unirMuestras } from "@/lib/unir";
 import { parsePrecio } from "@/lib/precio";
 import { cantidadValida, esDepartamento, type Fuente } from "@/lib/tipos";
 
@@ -63,5 +65,21 @@ export async function POST(req: NextRequest) {
       ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb
     )
     RETURNING *`) as Record<string, unknown>[];
-  return NextResponse.json(normalizarMuestra(fila), { status: 201 });
+  // ¿Ya existía esta prenda (mismo código/UPC o estilo)? Se junta con la existente en vez de repetirla.
+  const nueva = normalizarMuestra(fila) as Record<string, unknown>;
+  if (String(nueva.codigo ?? "").trim() || String(nueva.estilo ?? "").trim()) {
+    const otras = (await sql`
+      SELECT id, codigo, estilo, marca, descripcion, tienda FROM samples
+      WHERE eliminado_en IS NULL AND id <> ${Number(nueva.id)}`) as Record<string, unknown>[];
+    const t = (v: unknown) => String(v ?? "");
+    const comoDup = (f: Record<string, unknown>) => ({
+      id: Number(f.id), codigo: t(f.codigo), estilo: t(f.estilo), marca: "", descripcion: "", tienda: "",
+    });
+    const existente = otras.find((o) => sonLaMisma(comoDup(o), comoDup(nueva)));
+    if (existente) {
+      const unida = await unirMuestras(Number(existente.id), [Number(nueva.id)]);
+      return NextResponse.json({ ...unida, unida: true }, { status: 200 });
+    }
+  }
+  return NextResponse.json(nueva, { status: 201 });
 }
