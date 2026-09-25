@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ErrorAnalisis } from "@/lib/analisis";
 import { completarDesdeTicket } from "@/lib/completar";
 import { copiaDeDatos, db, normalizarMuestra } from "@/lib/db";
-import { buscarFotoEnInternet } from "@/lib/fotoInternet";
+import { buscarFotosPorColor } from "@/lib/fotoInternet";
 import { errorJson } from "@/lib/respuestas";
 import type { Fuente } from "@/lib/tipos";
 
@@ -48,7 +48,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       color = ${elegir(m.color, r.color)},
       tela = ${elegir(m.tela, r.tela)},
       estilo = ${elegir(m.estilo, r.estilo)},
-      dept = ${r.dept && m.origen === "ticket" ? r.dept : m.dept},
       notas = ${elegir(m.notas, r.notas)},
       fuentes = ${JSON.stringify([...fuentes.values()])}::jsonb,
       respaldo = ${JSON.stringify(respaldo)}::jsonb,
@@ -56,10 +55,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     WHERE id = ${id}
     RETURNING *`) as Record<string, unknown>[];
 
-  // Foto de la prenda (mejor esfuerzo).
+  // Fotos de la prenda, una por color (mejor esfuerzo).
   if (((fila.fotos_prenda as string[]) ?? []).length === 0) {
     try {
-      const foto = await buscarFotoEnInternet({
+      const r2 = await buscarFotosPorColor({
         marca: s(fila.marca),
         descripcion: s(fila.descripcion),
         codigo: s(fila.codigo),
@@ -67,12 +66,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         color: s(fila.color),
         tienda: s(fila.tienda),
       });
-      if (foto.foto) {
+      if (r2.fotos.length) {
         const conFuente = [...((fila.fuentes as Fuente[]) ?? [])];
-        if (foto.pagina && !conFuente.some((f) => f.url === foto.pagina)) conFuente.push({ url: foto.pagina, titulo: "Foto tomada de esta página" });
+        for (const pagina of r2.paginas) {
+          if (!conFuente.some((f) => f.url === pagina)) conFuente.push({ url: pagina, titulo: "Foto tomada de esta página" });
+        }
         // Solo si sigue sin foto (por si alguien le puso una mientras tanto).
         await sql`
-          UPDATE samples SET fotos_prenda = ${JSON.stringify([foto.foto])}::jsonb, fuentes = ${JSON.stringify(conFuente)}::jsonb
+          UPDATE samples SET fotos_prenda = ${JSON.stringify(r2.fotos)}::jsonb, fuentes = ${JSON.stringify(conFuente)}::jsonb
           WHERE id = ${id} AND fotos_prenda = '[]'::jsonb`;
       }
     } catch (e) {

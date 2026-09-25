@@ -70,6 +70,9 @@ async function crearTablas() {
   // Origen de la muestra ("ticket" si se creó desde un ticket) y si ya se completó automáticamente.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT ''`;
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS auto_revisado BOOLEAN NOT NULL DEFAULT false`;
+  // Renglón exacto del ticket que creó la muestra (tienda|fecha|renglón|código|precio): evita duplicar
+  // si el mismo ticket se sube dos veces, sin juntar prendas distintas con el mismo código.
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS ticket_linea TEXT NOT NULL DEFAULT ''`;
   // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
   await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
   await sql`CREATE INDEX IF NOT EXISTS samples_dept_idx ON samples (dept)`;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ErrorAnalisis } from "@/lib/analisis";
 import { db, normalizarMuestra } from "@/lib/db";
-import { buscarFotoEnInternet } from "@/lib/fotoInternet";
+import { buscarFotosPorColor } from "@/lib/fotoInternet";
 import { errorJson } from "@/lib/respuestas";
 import type { Fuente } from "@/lib/tipos";
 
@@ -23,7 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   let resultado;
   try {
-    resultado = await buscarFotoEnInternet({
+    resultado = await buscarFotosPorColor({
       marca: String(m.marca ?? ""),
       descripcion: String(m.descripcion ?? ""),
       codigo: String(m.codigo ?? ""),
@@ -35,19 +35,19 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (e instanceof ErrorAnalisis) return errorJson(e.message, e.estado);
     throw e;
   }
-  if (!resultado.foto) {
+  if (resultado.fotos.length === 0) {
     return errorJson(
-      resultado.pagina ? "Se encontró el producto pero la tienda no deja descargar la foto" : "No se encontró la foto en internet",
+      resultado.paginas.length ? "Se encontró el producto pero la tienda no deja descargar la foto" : "No se encontró la foto en internet",
       404,
     );
   }
 
   const fuentes = [...((m.fuentes as Fuente[]) ?? [])];
-  if (resultado.pagina && !fuentes.some((f) => f.url === resultado.pagina)) {
-    fuentes.push({ url: resultado.pagina, titulo: "Foto tomada de esta página" });
+  for (const pagina of resultado.paginas) {
+    if (!fuentes.some((f) => f.url === pagina)) fuentes.push({ url: pagina, titulo: "Foto tomada de esta página" });
   }
   const filas = (await sql`
-    UPDATE samples SET fotos_prenda = ${JSON.stringify([resultado.foto])}::jsonb, fuentes = ${JSON.stringify(fuentes)}::jsonb
+    UPDATE samples SET fotos_prenda = ${JSON.stringify(resultado.fotos)}::jsonb, fuentes = ${JSON.stringify(fuentes)}::jsonb
     WHERE id = ${id}
     RETURNING *`) as Record<string, unknown>[];
   return NextResponse.json(normalizarMuestra(filas[0]));

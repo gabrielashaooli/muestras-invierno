@@ -12,8 +12,11 @@ interface Renglon {
   codigo: string;
   precio: number | null;
   cantidad: number;
+  estilo: string;
+  color: string;
+  grupo: string;
   muestraId: number | null;
-  coincidencia: "codigo" | "claude" | null;
+  coincidencia: "codigo" | "claude" | "grupo" | null;
 }
 
 type Accion = "ignorar" | "crear" | `m${number}`; // m123 = ligar con la muestra 123
@@ -35,6 +38,7 @@ export default function SubirTicket({
 }) {
   const [paso, setPaso] = useState<"elegir" | "leyendo" | "revisar" | "aplicando" | "listo">("elegir");
   const [tienda, setTienda] = useState("");
+  const [fecha, setFecha] = useState("");
   const [renglones, setRenglones] = useState<Renglon[]>([]);
   const [acciones, setAcciones] = useState<Accion[]>([]);
   const [deptNuevas, setDeptNuevas] = useState<Departamento>("Mujer");
@@ -55,7 +59,7 @@ export default function SubirTicket({
       // Más resolución que las fotos normales para que se lean los renglones.
       const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirImagen(a, 2400))));
       const r = await conSesion(() =>
-        api<{ tienda: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes }) }),
+        api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes }) }),
       );
       if (!r) return;
       if (r.renglones.length === 0) {
@@ -64,6 +68,7 @@ export default function SubirTicket({
         return;
       }
       setTienda(r.tienda);
+      setFecha(r.fecha ?? "");
       setRenglones(r.renglones);
       setAcciones(r.renglones.map((x) => (x.muestraId ? (`m${x.muestraId}` as Accion) : "crear")));
       setPaso("revisar");
@@ -83,10 +88,12 @@ export default function SubirTicket({
           method: "POST",
           body: JSON.stringify({
             tienda,
+            fecha,
             renglones: renglones.map((x, i) => {
               const a = acciones[i];
               return {
                 ...x,
+                indice: i,
                 accion: a.startsWith("m") ? "ligar" : a,
                 muestraId: a.startsWith("m") ? Number(a.slice(1)) : null,
                 dept: deptNuevas,
@@ -127,8 +134,10 @@ export default function SubirTicket({
       await alCambiar();
       setResumen(
         [
-          r.actualizadas.length && `${r.actualizadas.length} muestra(s) marcadas como compradas`,
-          r.creadas.length && `${r.creadas.length} muestra(s) nuevas creadas`,
+          `${acciones.filter((a) => a !== "ignorar").length} artículos del ticket`,
+          r.actualizadas.length && `${r.actualizadas.length} ya existían y quedaron como compradas`,
+          r.creadas.length && `${r.creadas.length} nuevas`,
+          tienda && `Búscalas con el filtro de tienda "${tienda}"`,
           conFoto && `${conFoto} foto(s) encontradas en internet`,
           sinFoto && `${sinFoto} sin foto (puedes tomarla tú desde ⋯)`,
         ]
@@ -195,7 +204,9 @@ export default function SubirTicket({
                     {r.cantidad > 1 ? ` × ${r.cantidad}` : ""}
                   </span>
                 </div>
-                {r.codigo && <div className="pequeno">Código {r.codigo}</div>}
+                {(r.codigo || r.color) && (
+                  <div className="pequeno">{[r.color && `Color ${r.color}`, r.codigo && `Código ${r.codigo}`].filter(Boolean).join(" · ")}</div>
+                )}
                 <select
                   value={acciones[i]}
                   onChange={(e) => setAcciones((a) => a.map((x, j) => (j === i ? (e.target.value as Accion) : x)))}
@@ -210,6 +221,14 @@ export default function SubirTicket({
                     ))}
                   </optgroup>
                 </select>
+                {(acciones[i].startsWith("m")
+                  ? acciones.filter((x) => x === acciones[i]).length > 1
+                  : acciones[i] === "crear" &&
+                    renglones.filter((x, j) => x.grupo === r.grupo && acciones[j] === "crear").length > 1) && (
+                  <div className="pequeno" style={{ color: "var(--primario)" }}>
+                    Se junta con otro renglón en una sola muestra (otro color): se suman piezas y colores.
+                  </div>
+                )}
                 {r.coincidencia === "codigo" && acciones[i] === `m${r.muestraId}` && (
                   <div className="pequeno" style={{ color: "var(--exito)" }}>✓ Mismo código</div>
                 )}

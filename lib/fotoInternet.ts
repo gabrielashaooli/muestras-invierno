@@ -9,6 +9,8 @@ const INSTRUCCIONES_FOTO = `Encuentras la página de producto en internet de una
 Usa web_search con marca + descripción + código/UPC o número de estilo. Prefiere la página oficial de la tienda o marca
 (walmart.com, target.com, oldnavy.gap.com, etc.). Solo responde con páginas que correspondan a ESTA prenda (misma marca y
 mismo tipo de prenda; si hay código, el mismo). Si no estás seguro, deja vacío.
+Si se indica un color, busca la variante de ESE color (muchas tiendas tienen una URL o imagen por color) y
+prefiere imágenes de ese color.
 Responde SOLO con JSON: {"paginas":["https://..."],"imagenes":["https://...jpg"]}
 - "paginas": hasta 3 URLs de páginas de producto, la mejor primero.
 - "imagenes": URLs directas de imagen del producto si aparecieron en los resultados (si no, []).`;
@@ -83,7 +85,7 @@ export async function buscarFotoEnInternet(p: {
   estilo: string;
   color: string;
   tienda: string;
-}): Promise<{ foto: string | null; pagina: string | null }> {
+}, evitar: string[] = []): Promise<{ foto: string | null; pagina: string | null; imagen: string | null }> {
   const pista = [
     p.marca && `Marca: ${p.marca}`,
     p.descripcion && `Prenda: ${p.descripcion}`,
@@ -104,13 +106,43 @@ export async function buscarFotoEnInternet(p: {
     const html = (await res.text()).slice(0, 2_000_000);
     for (const img of imagenDePagina(html, pagina)) {
       const segura = urlSegura(img);
-      const foto = segura ? await guardarImagen(segura) : null;
-      if (foto) return { foto, pagina };
+      if (!segura || evitar.includes(segura)) continue; // misma imagen que otro color
+      const foto = await guardarImagen(segura);
+      if (foto) return { foto, pagina, imagen: segura };
     }
   }
   for (const img of directas) {
+    if (evitar.includes(img)) continue;
     const foto = await guardarImagen(img);
-    if (foto) return { foto, pagina: paginas[0] ?? null };
+    if (foto) return { foto, pagina: paginas[0] ?? null, imagen: img };
   }
-  return { foto: null, pagina: paginas[0] ?? null };
+  return { foto: null, pagina: paginas[0] ?? null, imagen: null };
+}
+
+// Una foto por cada color de la prenda (ej. "Negro, Beige" → 2 fotos). Máximo 4 colores.
+export async function buscarFotosPorColor(p: {
+  marca: string;
+  descripcion: string;
+  codigo: string;
+  estilo: string;
+  color: string;
+  tienda: string;
+}): Promise<{ fotos: string[]; paginas: string[] }> {
+  const colores = p.color.split(/\s*,\s*/).filter(Boolean).slice(0, 4);
+  const fotos: string[] = [];
+  const paginas: string[] = [];
+  const usadas: string[] = [];
+  for (const color of colores.length ? colores : [""]) {
+    try {
+      const r = await buscarFotoEnInternet({ ...p, color }, usadas);
+      if (r.foto && r.imagen) {
+        fotos.push(r.foto);
+        usadas.push(r.imagen);
+      }
+      if (r.pagina && !paginas.includes(r.pagina)) paginas.push(r.pagina);
+    } catch (e) {
+      console.error("No se pudo buscar la foto del color", color, e);
+    }
+  }
+  return { fotos, paginas };
 }
