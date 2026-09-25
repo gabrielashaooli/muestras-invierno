@@ -73,3 +73,28 @@ export function blobABase64(blob: Blob): Promise<string> {
     lector.readAsDataURL(blob);
   });
 }
+
+// Foto de ticket: en blanco y negro con más contraste (pesa mucho menos y se lee mejor) y
+// cuidando que no pase de `maxBytes`, porque el servidor rechaza envíos de más de ~4 MB.
+export async function comprimirTicket(archivo: File, maxBytes: number): Promise<Blob> {
+  const imagen = await decodificar(archivo);
+  let lado = 2200;
+  let calidad = 0.8;
+  for (let intento = 0; intento < 6; intento++) {
+    const escala = Math.min(1, lado / Math.max(imagen.ancho, imagen.alto));
+    const lienzo = document.createElement("canvas");
+    lienzo.width = Math.max(1, Math.round(imagen.ancho * escala));
+    lienzo.height = Math.max(1, Math.round(imagen.alto * escala));
+    const ctx = lienzo.getContext("2d");
+    if (!ctx) throw new Error("El navegador no soporta canvas");
+    ctx.filter = "grayscale(1) contrast(1.35)";
+    ctx.drawImage(imagen.fuente, 0, 0, lienzo.width, lienzo.height);
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      lienzo.toBlob((b) => (b ? resolve(b) : reject(new Error("No se pudo comprimir la imagen"))), "image/jpeg", calidad),
+    );
+    if (blob.size <= maxBytes) return blob;
+    lado = Math.round(lado * 0.82);
+    calidad = Math.max(0.6, calidad - 0.05);
+  }
+  throw new Error("La foto del ticket es demasiado pesada");
+}

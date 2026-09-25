@@ -15,6 +15,8 @@
   --navy-claro: #e8eef7;
   --verde: #127a4a;
   --verde-claro: #e3f3ea;
+  --ambar: #9a4a06;
+  --ambar-claro: #fdf3e3;
   --rojo: #b42318;
   --rojo-claro: #fdecea;
   --ia: #eef3fb;
@@ -1008,15 +1010,6 @@ details summary {
   font-variant-numeric: tabular-nums;
 }
 
-.etiqueta-falta {
-  align-self: flex-start;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--navy-claro);
-  color: var(--navy);
-}
 
 .elegida-ticket {
   display: flex;
@@ -1239,4 +1232,104 @@ details summary {
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
+}
+
+/* Ticket: cuenta de "Faltan" / "Ya están" y grupos. */
+.ticket-tienda {
+  margin: 0 4px 10px;
+  font-weight: 600;
+}
+
+.ticket-cuenta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ticket-cuenta > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: var(--radio);
+}
+
+.ticket-cuenta strong {
+  font-size: 1.8rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-cuenta span {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cuenta-falta {
+  background: var(--ambar-claro);
+  color: var(--ambar);
+}
+
+.cuenta-ok {
+  background: var(--verde-claro);
+  color: var(--verde);
+}
+
+.grupo-ticket {
+  margin-bottom: 14px;
+  padding: 10px 12px 2px;
+  border: 1px solid var(--linea);
+  border-left-width: 4px;
+  border-radius: var(--radio);
+}
+
+.grupo-ticket h3 {
+  margin: 2px 0 4px;
+  font-size: 1rem;
+}
+
+.grupo-ticket > .pequeno {
+  margin: 0 0 4px;
+}
+
+.grupo-ticket .renglon-ticket:last-child {
+  border-bottom: 0;
+}
+
+.grupo-ticket.falta {
+  border-left-color: var(--ambar);
+}
+
+.grupo-ticket.falta h3 {
+  color: var(--ambar);
+}
+
+.grupo-ticket.ok {
+  border-left-color: var(--verde);
+}
+
+.grupo-ticket.ok h3 {
+  color: var(--verde);
+}
+
+.lista-simple {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+}
+
+.lista-simple li {
+  padding: 2px 0;
+}
+
+.barra-aplicar {
+  position: sticky;
+  bottom: calc(-1 * (var(--seguro-abajo) + 20px)); /* pegada al borde de la hoja */
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  margin: 12px -20px calc(-1 * (var(--seguro-abajo) + 20px));
+  padding: 10px 20px calc(10px + var(--seguro-abajo));
+  background: var(--fondo);
+  border-top: 1px solid var(--linea);
 }

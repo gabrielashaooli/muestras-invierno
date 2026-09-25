@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { blobABase64, comprimirImagen } from "@/lib/imagen";
+import { blobABase64, comprimirTicket } from "@/lib/imagen";
 import { DEPARTAMENTOS, type Departamento, type Muestra } from "@/lib/tipos";
 import { IconoCamara, IconoGaleria } from "./Iconos";
 import type { ConSesion } from "./tipos";
@@ -45,7 +45,7 @@ export default function SubirTicket({
   const [acciones, setAcciones] = useState<Accion[]>([]);
   const [deptNuevas, setDeptNuevas] = useState<Departamento>("Mujer");
   const [avance, setAvance] = useState("");
-  const [resumen, setResumen] = useState("");
+  const [resumen, setResumen] = useState<{ estaban: string[]; agregadas: string[]; conFoto: number } | null>(null);
   const [error, setError] = useState("");
   const camara = useRef<HTMLInputElement>(null);
   const galeria = useRef<HTMLInputElement>(null);
@@ -57,8 +57,9 @@ export default function SubirTicket({
     setError("");
     setPaso("leyendo");
     try {
-      // Más resolución que las fotos normales para que se lean los renglones.
-      const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirImagen(a, 2400))));
+      // Blanco y negro, buena resolución y sin pasar el límite de envío (~3 MB entre todas).
+      const maxBytes = Math.min(1_500_000, Math.floor(2_200_000 / archivos.length));
+      const imagenes = await Promise.all(archivos.map(async (a) => blobABase64(await comprimirTicket(a, maxBytes))));
 
 
       const r = await conSesion(() =>
@@ -173,17 +174,12 @@ export default function SubirTicket({
       }
 
       await alCambiar();
-      const faltaban = renglones.filter((_, i) => acciones[i] === "crear").map((x) => x.descripcion || x.codigo);
-      setResumen(
-        [
-          `${acciones.filter((a) => a !== "ignorar").length} artículos del ticket`,
-          r.actualizadas.length && `${r.actualizadas.length} ya estaban: se actualizaron precio y descripción (sus fotos no se tocaron)`,
-          faltaban.length && `Faltaban en la app ${faltaban.length}: ${faltaban.join(", ")} (ya se agregaron)`,
-          conFoto && `${conFoto} foto(s) nuevas desde internet para las que no tenían`,
-        ]
-          .filter(Boolean)
-          .join(". ") + ".",
-      );
+      const nombre = (x: Renglon) => x.descripcion || x.codigo;
+      setResumen({
+        estaban: renglones.filter((_, i) => acciones[i].startsWith("m")).map(nombre),
+        agregadas: renglones.filter((_, i) => acciones[i] === "crear").map(nombre),
+        conFoto,
+      });
       setPaso("listo");
     } catch (err) {
       setError(`No se pudo aplicar: ${(err as Error).message}`);
@@ -192,8 +188,6 @@ export default function SubirTicket({
       setAvance("");
     }
   }
-
-  const hayNuevas = acciones.some((a) => a === "crear");
 
   // Muestras sugeridas para un renglón: primero las de la misma tienda que no se han ligado ni comprado.
   const claveTienda = tienda.toLowerCase().split(/\s+/)[0] ?? "";
@@ -237,13 +231,13 @@ export default function SubirTicket({
           <div className="estado"><span className="girando" /> {avance || "Leyendo ticket…"}</div>
         )}
 
-        {paso === "revisar" && (
-          <>
-            <p style={{ margin: "0 4px 12px" }}>
-              {tienda && <strong>{tienda}. </strong>}
-              Revisa a qué muestra va cada artículo:
-            </p>
-            {renglones.map((r, i) => (
+        {paso === "revisar" && (() => {
+          const faltan = renglones.map((_, i) => i).filter((i) => acciones[i] === "crear");
+          const estan = renglones.map((_, i) => i).filter((i) => acciones[i].startsWith("m"));
+          const ignorados = renglones.map((_, i) => i).filter((i) => acciones[i] === "ignorar");
+          const tarjeta = (i: number) => {
+            const r = renglones[i];
+            return (
               <div key={i} className="renglon-ticket">
                 <div className="renglon-cabeza">
                   <strong>{r.descripcion || r.codigo}</strong>
@@ -252,7 +246,6 @@ export default function SubirTicket({
                     {r.cantidad > 1 ? ` × ${r.cantidad}` : ""}
                   </span>
                 </div>
-                {acciones[i] === "crear" && <span className="etiqueta-falta">Falta en la app</span>}
                 {(r.codigo || r.color) && (
                   <div className="pequeno">{[r.color && `Color ${r.color}`, r.codigo && `Código ${r.codigo}`].filter(Boolean).join(" · ")}</div>
                 )}
@@ -266,39 +259,72 @@ export default function SubirTicket({
                   ? acciones.filter((x) => x === acciones[i]).length > 1
                   : acciones[i] === "crear" &&
                     renglones.filter((x, j) => x.grupo === r.grupo && acciones[j] === "crear").length > 1) && (
-                  <div className="pequeno" style={{ color: "var(--primario)" }}>
-                    Se junta con otro renglón en una sola muestra (otro color): se suman piezas y colores.
-                  </div>
-                )}
-                {r.coincidencia === "codigo" && acciones[i] === `m${r.muestraId}` && (
-                  <div className="pequeno" style={{ color: "var(--exito)" }}>✓ Mismo código</div>
+                  <div className="pequeno">Se junta con otro renglón en una sola muestra (otro color).</div>
                 )}
               </div>
-            ))}
-
-            {hayNuevas && (
-              <div className="campo" style={{ marginTop: 6 }}>
-                <label>Departamento de las nuevas</label>
-                <div className="segmentos" role="group" aria-label="Departamento de las nuevas">
-                  {DEPARTAMENTOS.map((d) => (
-                    <button key={d} aria-pressed={deptNuevas === d} onClick={() => setDeptNuevas(d)}>{d}</button>
-                  ))}
+            );
+          };
+          return (
+            <>
+              {tienda && <p className="ticket-tienda">{tienda}</p>}
+              <div className="ticket-cuenta">
+                <div className="cuenta-falta">
+                  <strong>{faltan.length}</strong>
+                  <span>Faltan en la app</span>
+                </div>
+                <div className="cuenta-ok">
+                  <strong>{estan.length}</strong>
+                  <span>Ya están</span>
                 </div>
               </div>
-            )}
 
-            <p className="nota-segura">
-              🔒 Tus fotos no se tocan. Se actualizan precio y descripción, y solo se busca foto para las que no tienen.
-            </p>
+              {faltan.length > 0 && (
+                <section className="grupo-ticket falta">
+                  <h3>Faltan en la app ({faltan.length})</h3>
+                  <p className="pequeno">
+                    Si ya la tienes, tócala en las fotos. Si no, se agrega como nueva al tocar Aplicar.
+                  </p>
+                  {faltan.map(tarjeta)}
+                </section>
+              )}
 
-            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-              <button className="boton" onClick={alCerrar}>Cancelar</button>
-              <button className="boton primario" style={{ flex: 1 }} onClick={aplicar}>
-                Aplicar ({acciones.filter((a) => a !== "ignorar").length})
-              </button>
-            </div>
-          </>
-        )}
+              {estan.length > 0 && (
+                <section className="grupo-ticket ok">
+                  <h3>✓ Ya están ({estan.length})</h3>
+                  <p className="pequeno">Se marcan como compradas y se actualiza el precio.</p>
+                  {estan.map(tarjeta)}
+                </section>
+              )}
+
+              {ignorados.length > 0 && (
+                <section className="grupo-ticket">
+                  <h3>No son muestras ({ignorados.length})</h3>
+                  {ignorados.map(tarjeta)}
+                </section>
+              )}
+
+              {faltan.length > 0 && (
+                <div className="campo" style={{ marginTop: 6 }}>
+                  <label>Departamento de las nuevas</label>
+                  <div className="segmentos" role="group" aria-label="Departamento de las nuevas">
+                    {DEPARTAMENTOS.map((d) => (
+                      <button key={d} aria-pressed={deptNuevas === d} onClick={() => setDeptNuevas(d)}>{d}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="nota-segura">🔒 Tus fotos no se tocan.</p>
+
+              <div className="barra-aplicar">
+                <button className="boton" onClick={alCerrar}>Cancelar</button>
+                <button className="boton primario" style={{ flex: 1 }} onClick={aplicar}>
+                  Aplicar ({acciones.filter((a) => a !== "ignorar").length})
+                </button>
+              </div>
+            </>
+          );
+        })()}
 
         {paso === "aplicando" && (
           <div className="estado"><span className="girando" /> {avance}</div>
@@ -306,7 +332,22 @@ export default function SubirTicket({
 
         {paso === "listo" && (
           <>
-            <div className="estado ok" style={{ marginTop: 0 }}>{resumen}</div>
+            {resumen && (
+              <>
+                <section className="grupo-ticket ok">
+                  <h3>✓ Ya estaban ({resumen.estaban.length})</h3>
+                  <p className="pequeno">Marcadas como compradas. Sus fotos no se tocaron.</p>
+                  <ul className="lista-simple">{resumen.estaban.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </section>
+                {resumen.agregadas.length > 0 && (
+                  <section className="grupo-ticket falta">
+                    <h3>Faltaban y se agregaron ({resumen.agregadas.length})</h3>
+                    <ul className="lista-simple">{resumen.agregadas.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                  </section>
+                )}
+                {resumen.conFoto > 0 && <p className="pequeno">{resumen.conFoto} foto(s) nuevas desde internet para las que no tenían.</p>}
+              </>
+            )}
             <button className="boton primario ancho" style={{ marginTop: 12 }} onClick={alCerrar}>Listo</button>
           </>
         )}

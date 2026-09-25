@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { errorJson } from "@/lib/respuestas";
 import { aMuestrasParaTicket, leerTicket } from "@/lib/ticket";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // POST /api/ticket { imagenes: string[] } — lee el ticket y propone a qué muestra corresponde cada artículo.
 // No cambia nada: solo devuelve la propuesta para que la persona la confirme.
