@@ -17,13 +17,16 @@ export default function Resumen({
   muestras,
   keyItems,
   titulo: nombreColeccion,
+  coleccionId,
 }: {
+  coleccionId?: number | null;
   muestras: Muestra[];
   keyItems: KeyItem[];
   titulo?: string;
 }) {
   // Exportar PDF con fotos: qué incluir y avance.
   const [soloCompradas, setSoloCompradas] = useState(false);
+  const [conPrecios, setConPrecios] = useState(true);
   const [deptPdf, setDeptPdf] = useState<Departamento | "">("");
   const [avance, setAvance] = useState<string>("");
   const [errorPdf, setErrorPdf] = useState("");
@@ -37,9 +40,9 @@ export default function Resumen({
     setAvance("Preparando…");
     try {
       const titulo = [`Muestras ${nombreColeccion ?? ""}`.trim(), deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
-      const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`));
+      const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`), conPrecios);
       const fecha = new Date().toISOString().slice(0, 10);
-      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}-${fecha}.pdf`.toLowerCase());
+      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}${conPrecios ? "" : "-sin-precios"}-${fecha}.pdf`.toLowerCase());
     } catch (e) {
       setErrorPdf(`No se pudo crear el PDF: ${(e as Error).message}`);
     } finally {
@@ -164,6 +167,10 @@ export default function Resumen({
           <button aria-pressed={!soloCompradas} onClick={() => setSoloCompradas(false)}>Todas</button>
           <button aria-pressed={soloCompradas} onClick={() => setSoloCompradas(true)}>Solo compradas</button>
         </div>
+        <div className="segmentos" role="group" aria-label="Precios">
+          <button aria-pressed={conPrecios} onClick={() => setConPrecios(true)}>Con precios</button>
+          <button aria-pressed={!conPrecios} onClick={() => setConPrecios(false)}>Sin precios</button>
+        </div>
         <button className="boton primario ancho" onClick={descargarPdf} disabled={Boolean(avance) || paraPdf.length === 0}>
           {avance ? (
             <><span className="girando" /> {avance}</>
@@ -174,8 +181,8 @@ export default function Resumen({
         {errorPdf && <div className="estado error">{errorPdf}</div>}
       </section>
 
-      <a className="boton ancho" href="/api/export" download>
-        <IconoDescarga /> Descargar tabla (CSV para Excel)
+      <a className="boton ancho" href={`/api/export?precios=${conPrecios ? 1 : 0}${coleccionId ? `&coleccion=${coleccionId}` : ""}`} download>
+        <IconoDescarga /> Descargar tabla para Excel ({conPrecios ? "con precios" : "sin precios"})
       </a>
     </>
   );

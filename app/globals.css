@@ -1343,3 +1343,14 @@ details summary {
   background: var(--gris);
   color: var(--texto);
 }
+
+.subtitulo-ticket {
+  margin: 18px 4px 6px;
+  font-size: 0.9rem;
+  color: var(--suave);
+}
+
+.ticket-guardado {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}

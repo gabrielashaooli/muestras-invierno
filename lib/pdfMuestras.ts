@@ -82,6 +82,7 @@ export async function generarPdfMuestras(
   muestras: Muestra[],
   titulo: string,
   alAvanzar: (hechas: number, total: number) => void,
+  conPrecios = true,
 ): Promise<Blob> {
   const pdf = await PDFDocument.create();
   const normal = await pdf.embedFont(StandardFonts.Helvetica);
@@ -154,8 +155,9 @@ export async function generarPdfMuestras(
     y -= 2;
 
     const cant = m.cantidad ?? 1;
-    const precio =
-      m.precio_usd === null
+    const precio = !conPrecios
+      ? `${cant} ${cant === 1 ? "pieza" : "piezas"}`
+      : m.precio_usd === null
         ? `Sin precio${cant > 1 ? ` · ${cant} pzas` : ""}`
         : cant > 1
           ? `${usd.format(m.precio_usd)} x ${cant} = ${usd.format(m.precio_usd * cant)}`

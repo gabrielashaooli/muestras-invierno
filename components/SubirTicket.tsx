@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { blobABase64, comprimirTicket } from "@/lib/imagen";
 import { DEPARTAMENTOS, type Departamento, type Muestra } from "@/lib/tipos";
+import { TICKETS_GUARDADOS } from "@/lib/ticketsGuardados";
 import { IconoCamara, IconoGaleria } from "./Iconos";
 import type { ConSesion } from "./tipos";
 
@@ -126,9 +127,9 @@ export default function SubirTicket({
   // con tus muestras por código. No usa Claude.
   const [texto, setTexto] = useState("");
   const [tiendaTexto, setTiendaTexto] = useState("Target");
-  async function leerTexto() {
+  async function leerTexto(contenido = texto, nombreTienda = tiendaTexto, fechaTicket = "") {
     const leidos: Renglon[] = [];
-    for (const linea of texto.split(/\n+/)) {
+    for (const linea of contenido.split(/\n+/)) {
       if (/regular price|subtotal|total|tax|payment|change|tend/i.test(linea)) continue;
       // Acepta "código nombre precio" o "nombre código precio N" (Walmart).
       const sinMarca = linea.trim().replace(/\s+[A-Z]$/, "");
@@ -173,8 +174,8 @@ export default function SubirTicket({
         }),
       );
       if (!e) return;
-      setTienda(tiendaTexto.trim());
-      setFecha("");
+      setTienda(nombreTienda.trim());
+      setFecha(fechaTicket);
       setRenglones(e.renglones);
       setAcciones(e.renglones.map((x) => (x.muestraId ? (`m${x.muestraId}` as Accion) : "crear")));
       setPaso("revisar");
@@ -289,6 +290,13 @@ export default function SubirTicket({
             <button className="boton ancho" style={{ marginTop: 10 }} onClick={() => setPaso("texto")}>
               Escribir o pegar el ticket (sin créditos)
             </button>
+            <h3 className="subtitulo-ticket">Tickets ya escritos (sin créditos)</h3>
+            {TICKETS_GUARDADOS.map((t) => (
+              <button key={t.tienda} className="boton ancho ticket-guardado" onClick={() => leerTexto(t.texto, t.tienda, t.fecha)}>
+                <span>{t.tienda}</span>
+                <span className="pequeno">{t.texto.split("\n").length} artículos · {usd.format(t.total)}</span>
+              </button>
+            ))}
           </>
         )}
 
@@ -310,7 +318,7 @@ export default function SubirTicket({
             />
             <div className="barra-aplicar">
               <button className="boton" onClick={() => setPaso("elegir")}>Atrás</button>
-              <button className="boton primario" style={{ flex: 1 }} onClick={leerTexto} disabled={!texto.trim()}>
+              <button className="boton primario" style={{ flex: 1 }} onClick={() => leerTexto()} disabled={!texto.trim()}>
                 Revisar
               </button>
             </div>

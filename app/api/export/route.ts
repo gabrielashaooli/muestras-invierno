@@ -10,7 +10,10 @@ function celda(valor: unknown): string {
 // GET /api/export — CSV con BOM para que Excel respete acentos.
 export async function GET(req: Request) {
   // Las fotos guardadas en la base tienen ruta relativa; en el CSV van completas.
-  const origen = new URL(req.url).origin;
+  const url = new URL(req.url);
+  const origen = url.origin;
+  const conPrecios = url.searchParams.get("precios") !== "0";
+  const coleccion = Number(url.searchParams.get("coleccion")) || null;
   const absolutas = (lista: unknown) =>
     ((lista as string[]) ?? []).map((u) => (u.startsWith("/") ? origen + u : u)).join(" ");
 
@@ -18,7 +21,7 @@ export async function GET(req: Request) {
   const filas = ((await sql`
     SELECT s.*, k.nombre AS key_item_nombre
     FROM samples s LEFT JOIN key_items k ON k.id = s.key_item_id
-    WHERE s.eliminado_en IS NULL
+    WHERE s.eliminado_en IS NULL AND (${coleccion}::int IS NULL OR s.coleccion_id = ${coleccion})
     ORDER BY s.dept, s.creado_en`) as Record<string, unknown>[]).map(normalizarMuestra);
 
   const columnas: [string, (f: Record<string, unknown>) => unknown][] = [
@@ -44,6 +47,11 @@ export async function GET(req: Request) {
     ["Creado", (f) => new Date(f.creado_en as string).toISOString()],
   ];
 
+  // Sin precios: se quitan las columnas de dinero.
+  if (!conPrecios) {
+    for (let i = columnas.length - 1; i >= 0; i--) if (/USD/.test(columnas[i][0])) columnas.splice(i, 1);
+  }
+
   const lineas = [
     columnas.map(([titulo]) => celda(titulo)).join(","),
     ...filas.map((f) => columnas.map(([, valor]) => celda(valor(f))).join(",")),
@@ -54,7 +62,7 @@ export async function GET(req: Request) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="muestras-${fecha}.csv"`,
+      "Content-Disposition": `attachment; filename="muestras${conPrecios ? "" : "-sin-precios"}-${fecha}.csv"`,
       "Cache-Control": "no-store",
     },
   });

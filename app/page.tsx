@@ -177,7 +177,7 @@ export default function Inicio() {
       {vista === "agregar" && (
         <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} />
       )}
-      {vista === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} />}
+      {vista === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} coleccionId={activa} />}
       {vista === "keyitems" && <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />}
 
       {ticket && (
