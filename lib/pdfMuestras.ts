@@ -121,7 +121,8 @@ export async function generarPdfMuestras(
 
     // Foto de la prenda (grande) y etiqueta (chica).
     const urlPrenda = m.fotos_prenda?.[0] ?? null;
-    const urlEtiqueta = m.fotos[0] ?? null;
+    // Sin precios tampoco va la etiqueta (ahí viene el precio).
+    const urlEtiqueta = conPrecios ? m.fotos[0] ?? null : null;
     const anchoPrenda = 150;
     const anchoEtiqueta = 80;
 
@@ -135,12 +136,14 @@ export async function generarPdfMuestras(
 
     const xEtiqueta = MARGEN + anchoPrenda + 8;
     const altoEtiqueta = anchoEtiqueta * 1.33;
-    if (bytesEtiqueta) dibujarFoto(p, await pdf.embedJpg(bytesEtiqueta), xEtiqueta, arriba - altoEtiqueta, anchoEtiqueta, altoEtiqueta);
+    if (!conPrecios) {
+      /* sin etiqueta */
+    } else if (bytesEtiqueta) dibujarFoto(p, await pdf.embedJpg(bytesEtiqueta), xEtiqueta, arriba - altoEtiqueta, anchoEtiqueta, altoEtiqueta);
     else recuadroVacio(p, xEtiqueta, arriba - altoEtiqueta, anchoEtiqueta, altoEtiqueta, normal, "Sin etiqueta");
-    p.drawText("Etiqueta", { x: xEtiqueta, y: arriba - altoEtiqueta - 11, size: 8, font: normal, color: GRIS });
+    if (conPrecios) p.drawText("Etiqueta", { x: xEtiqueta, y: arriba - altoEtiqueta - 11, size: 8, font: normal, color: GRIS });
 
     // Datos.
-    const xTexto = xEtiqueta + anchoEtiqueta + 14;
+    const xTexto = conPrecios ? xEtiqueta + anchoEtiqueta + 14 : MARGEN + anchoPrenda + 16;
     const anchoTexto = ANCHO - MARGEN - xTexto;
     let y = arriba - 12;
 

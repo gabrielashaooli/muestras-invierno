@@ -42,7 +42,7 @@ export default function Resumen({
       const titulo = [`Muestras ${nombreColeccion ?? ""}`.trim(), deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
       const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`), conPrecios);
       const fecha = new Date().toISOString().slice(0, 10);
-      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}${conPrecios ? "" : "-sin-precios"}-${fecha}.pdf`.toLowerCase());
+      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}${conPrecios ? "" : "-sin-precios-sin-etiqueta"}-${fecha}.pdf`.toLowerCase());
     } catch (e) {
       setErrorPdf(`No se pudo crear el PDF: ${(e as Error).message}`);
     } finally {
@@ -169,7 +169,7 @@ export default function Resumen({
         </div>
         <div className="segmentos" role="group" aria-label="Precios">
           <button aria-pressed={conPrecios} onClick={() => setConPrecios(true)}>Con precios</button>
-          <button aria-pressed={!conPrecios} onClick={() => setConPrecios(false)}>Sin precios</button>
+          <button aria-pressed={!conPrecios} onClick={() => setConPrecios(false)}>Sin precios ni etiqueta</button>
         </div>
         <button className="boton primario ancho" onClick={descargarPdf} disabled={Boolean(avance) || paraPdf.length === 0}>
           {avance ? (
@@ -182,7 +182,7 @@ export default function Resumen({
       </section>
 
       <a className="boton ancho" href={`/api/export?precios=${conPrecios ? 1 : 0}${coleccionId ? `&coleccion=${coleccionId}` : ""}`} download>
-        <IconoDescarga /> Descargar tabla para Excel ({conPrecios ? "con precios" : "sin precios"})
+        <IconoDescarga /> Descargar tabla para Excel ({conPrecios ? "con precios" : "sin precios ni etiqueta"})
       </a>
     </>
   );

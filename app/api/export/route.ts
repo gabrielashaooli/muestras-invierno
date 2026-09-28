@@ -47,9 +47,9 @@ export async function GET(req: Request) {
     ["Creado", (f) => new Date(f.creado_en as string).toISOString()],
   ];
 
-  // Sin precios: se quitan las columnas de dinero.
+  // Sin precios: se quitan las columnas de dinero y las fotos de etiqueta (traen el precio).
   if (!conPrecios) {
-    for (let i = columnas.length - 1; i >= 0; i--) if (/USD/.test(columnas[i][0])) columnas.splice(i, 1);
+    for (let i = columnas.length - 1; i >= 0; i--) if (/USD|etiqueta/i.test(columnas[i][0])) columnas.splice(i, 1);
   }
 
   const lineas = [
