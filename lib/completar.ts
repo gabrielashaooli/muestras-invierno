@@ -4,14 +4,14 @@ import { esDepartamento } from "./tipos";
 // Completa una muestra creada desde un ticket: el ticket trae textos abreviados
 // (ej. "FA CABLE POLO"); con búsqueda web se identifica la prenda y se escribe bien.
 
-const INSTRUCCIONES_COMPLETAR = `Te dan un artículo de ropa tal como aparece en un ticket de compra de una tienda en Estados Unidos
-(texto abreviado, código/UPC o número de artículo, tienda y precio). Busca en internet con web_search para identificar
+const INSTRUCCIONES_COMPLETAR = `Te dan un artículo de ropa tal como aparece en un ticket de compra (tiendas de Estados Unidos, China u otro país;
+el texto puede venir abreviado o en chino u otro idioma), con código/UPC o número de artículo, tienda y precio. Busca en internet con web_search para identificar
 exactamente qué prenda es (usa el código/UPC y la tienda; por ejemplo "walmart 198566802913" o el texto del ticket).
 
 Reglas:
 - PROHIBIDO inventar. Solo llena un campo si lo confirmaste en una fuente que corresponde a ESTE artículo, o si es obvio
   por el texto del ticket. Si no, "".
-- "desc": descripción corta y clara en español de la prenda (ej. "Polo de punto trenzado manga corta"). Si no pudiste
+- "desc": descripción corta y clara en español (traduce si el ticket viene en otro idioma) de la prenda (ej. "Polo de punto trenzado manga corta"). Si no pudiste
   confirmar el producto, traduce solo lo que es seguro del texto del ticket (ej. "POLO" → "Polo"); nunca dejes abreviaturas.
 - "marca": marca real (ej. "FA" en Walmart es "Free Assembly") solo si se confirmó.
 - "color", "tela" (composición), "estilo" (número de estilo): solo si se confirmaron.
@@ -25,7 +25,11 @@ const limpio = (v: unknown) => {
   return DUDOSO.test(s) ? "" : s;
 };
 
-export async function completarDesdeTicket(p: { texto: string; codigo: string; tienda: string; precio: number | null }) {
+// completo = búsqueda a fondo (más búsquedas y más razonamiento); cuesta más créditos.
+export async function completarDesdeTicket(
+  p: { texto: string; codigo: string; tienda: string; precio: number | null },
+  completo = false,
+) {
   const pista = [
     `Texto en el ticket: ${p.texto || "(sin texto)"}`,
     p.codigo && `Código/UPC: ${p.codigo}`,
@@ -36,7 +40,12 @@ export async function completarDesdeTicket(p: { texto: string; codigo: string; t
     p.precio !== null && `Precio pagado: $${p.precio}`,
   ].filter(Boolean).join("\n");
 
-  const { datos, fuentes } = await consultarClaude(INSTRUCCIONES_COMPLETAR, [{ type: "text", text: pista }], 2);
+  const { datos, fuentes } = await consultarClaude(
+    INSTRUCCIONES_COMPLETAR,
+    [{ type: "text", text: pista }],
+    completo ? 5 : 2,
+    completo ? "medium" : "low",
+  );
   return {
     desc: limpio(datos.desc),
     marca: limpio(datos.marca),

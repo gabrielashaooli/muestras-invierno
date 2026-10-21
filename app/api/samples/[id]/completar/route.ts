@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       codigo: s(m.codigo),
       tienda: s(m.tienda),
       precio: m.precio_usd === null ? null : Number(m.precio_usd),
-    });
+    }, cuerpo?.completo === true);
   } catch (e) {
     if (e instanceof ErrorAnalisis && e.estado === 429) return errorJson(e.message, 429); // reintentar después
     await sql`UPDATE samples SET auto_revisado = true WHERE id = ${id}`;

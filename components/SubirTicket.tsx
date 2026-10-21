@@ -18,6 +18,7 @@ interface Renglon {
   grupo: string;
   muestraId: number | null;
   coincidencia: "codigo" | "claude" | "grupo" | null;
+  nota?: string; // ej. "Precio en ticket: 199.00 CNY"
 }
 
 type Accion = "ignorar" | "crear" | `m${number}`; // m123 = ligar con la muestra 123
@@ -48,6 +49,8 @@ export default function SubirTicket({
   const [avance, setAvance] = useState("");
   const [resumen, setResumen] = useState<{ estaban: string[]; agregadas: string[]; conFoto: number } | null>(null);
   const [error, setError] = useState("");
+  // Búsqueda a fondo en internet de TODOS los artículos (ej. tiendas chinas). Usa más créditos.
+  const [completo, setCompleto] = useState(false);
   const camara = useRef<HTMLInputElement>(null);
   const galeria = useRef<HTMLInputElement>(null);
 
@@ -64,9 +67,13 @@ export default function SubirTicket({
 
 
       const r = await conSesion(() =>
-        api<{ tienda: string; fecha: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes, coleccion_id: coleccionId }) }),
+        api<{ tienda: string; fecha: string; moneda?: string; renglones: Renglon[] }>("/api/ticket", { method: "POST", body: JSON.stringify({ imagenes, coleccion_id: coleccionId }) }),
       );
       if (!r) return;
+      // Ticket en otra moneda o en chino/japonés/coreano: se propone buscar todo a fondo.
+      if ((r.moneda && r.moneda !== "USD") || r.renglones.some((x) => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(x.descripcion))) {
+        setCompleto(true);
+      }
       if (r.renglones.length === 0) {
         setError("No se encontraron artículos en el ticket. Intenta con otra foto más clara.");
         setPaso("elegir");
@@ -224,7 +231,7 @@ export default function SubirTicket({
         const m = muestras.find((x) => x.id === id);
         return !m || !m.descripcion?.trim() || m.fotos.length + (m.fotos_prenda?.length ?? 0) === 0;
       };
-      const porCompletar = [...r.creadas, ...r.actualizadas.filter(leFalta)];
+      const porCompletar = completo ? [...r.creadas, ...r.actualizadas] : [...r.creadas, ...r.actualizadas.filter(leFalta)];
       let conFoto = 0;
       for (let i = 0; i < porCompletar.length; i++) {
         setAvance(`Actualizando descripciones ${i + 1} de ${porCompletar.length}…`);
@@ -233,7 +240,7 @@ export default function SubirTicket({
           const antes = muestras.find((m) => m.id === id)?.fotos_prenda?.length ?? 0;
           const m = await api<Muestra>(`/api/samples/${id}/completar`, {
             method: "POST",
-            body: JSON.stringify({ texto_ticket: textoDe.get(id) ?? "" }),
+            body: JSON.stringify({ texto_ticket: textoDe.get(id) ?? "", completo }),
           });
           if (!antes && m.fotos_prenda?.length) conFoto++;
         } catch (e) {
@@ -345,7 +352,7 @@ export default function SubirTicket({
                 <div className="renglon-cabeza">
                   <strong>{r.descripcion || r.codigo}</strong>
                   <span>
-                    {r.precio !== null ? usd.format(r.precio) : "—"}
+                    {r.precio !== null ? usd.format(r.precio) : r.nota ? r.nota.replace("Precio en ticket: ", "") : "—"}
                     {r.cantidad > 1 ? ` × ${r.cantidad}` : ""}
                   </span>
                 </div>
@@ -416,6 +423,16 @@ export default function SubirTicket({
                   </div>
                 </div>
               )}
+
+              <label className="opcion-completa">
+                <input type="checkbox" checked={completo} onChange={(e) => setCompleto(e.target.checked)} />
+                <span>
+                  <strong>Buscar todo en internet</strong>
+                  <span className="pequeno">
+                    Descripción, marca y foto de todos los artículos, buscando a fondo. Útil en tiendas chinas. Usa más créditos.
+                  </span>
+                </span>
+              </label>
 
               <p className="nota-segura">🔒 Tus fotos no se tocan.</p>
 

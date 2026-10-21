@@ -17,6 +17,7 @@ export interface RenglonTicket {
   sugerido?: number | null; // muestra que sugirió Claude al leer el ticket
   muestraId: number | null; // muestra que corresponde (si se encontró)
   coincidencia: "codigo" | "claude" | "grupo" | null; // cómo se encontró
+  nota?: string; // ej. precio en otra moneda, tal como viene en el ticket
 }
 
 export interface MuestraParaTicket {
@@ -30,25 +31,28 @@ export interface MuestraParaTicket {
   precio_usd: number | null;
 }
 
-const INSTRUCCIONES_TICKET = `Lees tickets (recibos) de compra de tiendas de ropa en Estados Unidos (Walmart, Target, Old Navy, etc.).
+const INSTRUCCIONES_TICKET = `Lees tickets (recibos) de compra de tiendas de ropa (Walmart, Target, Old Navy, tiendas de China u otros países).
+El ticket puede venir en inglés, chino u otro idioma.
 Extrae cada artículo comprado. Ignora subtotales, impuestos (TAX), descuentos generales, bolsas, totales y formas de pago.
 
 Para cada artículo:
-- "descripcion": el texto del artículo tal cual (ej. "FA CABLE POLO").
+- "descripcion": el texto del artículo tal cual (ej. "FA CABLE POLO"); si está en chino u otro idioma, ponlo traducido al
+  español y entre paréntesis el original (ej. "Suéter de punto (针织毛衣)").
 - "codigo": el número del artículo o UPC que aparece junto a él (solo dígitos), o "". (En Target es el DPCI de 9 dígitos.)
 - "producto": el nombre de la prenda si el ticket lo trae (ej. "W's corduroy vest", "HEATTECH CREW NECK T").
   Si el renglón solo trae la MARCA o un departamento (ej. en Target "Cat & Jack", "Champion", "A New Day"), pon "".
 - "estilo": SOLO si el ticket imprime explícitamente un número de estilo/producto aparte del código; si no, "".
   Nunca lo inventes ni lo saques recortando el código (en muchas tiendas todos los códigos empiezan igual).
 - "color": el color si aparece en el ticket (en español), o "".
-- "precio": precio unitario en USD como número con punto (ej. "12.98"). Si hay descuento en ese renglón, el precio final. Si no se lee claro, "".
+- "precio": precio unitario como número con punto (ej. "12.98"), en la moneda del ticket. Si hay descuento en ese renglón, el precio final. Si no se lee claro, "".
 - "cantidad": número de piezas (si dice "2 @ 9.98" son 2). Si no dice, 1.
 - "muestraId": el id de la muestra de la lista que corresponde CLARAMENTE a este artículo (misma marca/tipo de prenda y
   precio parecido, o código igual). Si hay duda, null. Nunca repitas un id en dos artículos.
 
 Ignora renglones informativos que no son artículos (ej. "Regular Price $40.00", "You saved…").
+Además, "moneda": código de la moneda del ticket (USD, CNY, MXN, etc.). Si no se ve claro, "USD".
 No inventes renglones ni juntes renglones: un objeto por cada renglón del ticket. Responde SOLO con JSON:
-{"tienda":"","fecha":"","articulos":[{"descripcion":"","producto":"","codigo":"","estilo":"","color":"","precio":"","cantidad":1,"muestraId":null}]}`;
+{"tienda":"","fecha":"","moneda":"USD","articulos":[{"descripcion":"","producto":"","codigo":"","estilo":"","color":"","precio":"","cantidad":1,"muestraId":null}]}`;
 
 export { mismoCodigo } from "./codigos";
 
@@ -73,7 +77,12 @@ export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket
       },
     ],
     0,
+    "medium", // tickets en otros idiomas o letra borrosa: vale la pena un poco más de razonamiento
   );
+
+  // Precios en otra moneda no se guardan como dólares: van en una nota con su moneda.
+  const moneda = String(datos.moneda ?? "USD").trim().toUpperCase().slice(0, 5) || "USD";
+  const esUsd = moneda === "USD" || moneda === "US$";
 
   const articulos = Array.isArray(datos.articulos) ? (datos.articulos as Record<string, unknown>[]) : [];
   const normal = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -93,7 +102,8 @@ export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket
       estilo: String(a.estilo ?? "").replace(/\s/g, ""),
       color: String(a.color ?? "").trim().slice(0, 60),
       grupo: producto ? `p:${producto}|${precioOk ?? ""}` : `u:${codigo || descripcion}|${i}`,
-      precio: precioOk,
+      precio: esUsd ? precioOk : null,
+      nota: !esUsd && precioOk !== null ? `Precio en ticket: ${precioOk.toFixed(2)} ${moneda}` : undefined,
       cantidad: cantidadValida(a.cantidad),
       sugerido: Number.isInteger(sugerido) && sugerido > 0 ? sugerido : null,
       muestraId: null,
@@ -106,6 +116,7 @@ export async function leerTicket(imagenes: Imagen[], muestras: MuestraParaTicket
   return {
     tienda: String(datos.tienda ?? "").trim().slice(0, 200),
     fecha: String(datos.fecha ?? "").trim().slice(0, 50),
+    moneda,
     renglones: renglones.filter((r) => r.descripcion || r.codigo),
   };
 }

@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
   const unirColores = (...listas: string[]) =>
     [...new Map(listas.flatMap((l) => l.split(/\s*,\s*/)).filter(Boolean).map((c) => [c.toLowerCase(), c])).values()].join(", ");
 
+  // Agrega la nota del ticket (ej. precio en yuanes) a las notas, sin repetirla.
+  const conNota = (notas: string, nota: string) => (!nota || notas.includes(nota) ? notas : [notas, nota].filter(Boolean).join(" · "));
+
   // 1) Ligar: todos los renglones que van a la misma muestra (ej. la misma prenda en 2 colores)
   //    se juntan: se suman las piezas y se agregan los colores.
-  const ligar = new Map<number, { cantidad: number; precio: number | null; codigo: string; estilo: string; colores: string }>();
+  const ligar = new Map<number, { cantidad: number; precio: number | null; codigo: string; estilo: string; colores: string; nota: string }>();
   for (const r of renglones) {
     if (r.accion !== "ligar" || !(Number(r.muestraId) > 0)) continue;
     const id = Number(r.muestraId);
@@ -43,6 +46,7 @@ export async function POST(req: NextRequest) {
       codigo: previo?.codigo || texto(r.codigo, 100),
       estilo: previo?.estilo || texto(r.estilo, 100),
       colores: unirColores(previo?.colores ?? "", texto(r.color, 60)),
+      nota: previo?.nota || texto(r.nota, 200),
     });
   }
 
@@ -61,6 +65,7 @@ export async function POST(req: NextRequest) {
         estilo = ${String(m.estilo ?? "").trim() ? m.estilo : d.estilo},
         color = ${unirColores(String(m.color ?? ""), d.colores)},
         tienda = ${String(m.tienda ?? "").trim() ? m.tienda : tienda},
+        notas = ${conNota(String(m.notas ?? ""), d.nota)},
         respaldo = ${JSON.stringify(respaldo)}::jsonb
       WHERE id = ${id}`;
     actualizadas.push(id);
@@ -91,9 +96,10 @@ export async function POST(req: NextRequest) {
     }
     const dept = esDepartamento(primero.dept) ? primero.dept : "Mujer";
     const [nueva] = (await sql`
-      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, estilo, color, origen, ticket_linea, coleccion_id)
+      INSERT INTO samples (dept, status, descripcion, tienda, precio_usd, cantidad, codigo, estilo, color, notas, origen, ticket_linea, coleccion_id)
       VALUES (${dept}, 'comprado', ${texto(primero.descripcion)}, ${tienda}, ${precio}, ${cantidad},
-              ${texto(primero.codigo, 100)}, ${texto(primero.estilo, 100)}, ${colores}, 'ticket', ${linea}, ${coleccionId})
+              ${texto(primero.codigo, 100)}, ${texto(primero.estilo, 100)}, ${colores}, ${texto(primero.nota, 200)},
+              'ticket', ${linea}, ${coleccionId})
       RETURNING id`) as { id: number }[];
     creadas.push(nueva.id);
   }
