@@ -61,10 +61,10 @@ export async function POST(req: NextRequest) {
       : (((await sql`SELECT id FROM colecciones WHERE eliminado_en IS NULL ORDER BY creado_en DESC LIMIT 1`) as { id: number }[])[0]?.id ?? null);
   const [fila] = (await sql`
     INSERT INTO samples (
-      dept, status, descripcion, key_item_id, tienda, marca, precio_usd, cantidad,
+      dept, status, descripcion, key_item_id, tienda, proveedor, marca, precio_usd, cantidad,
       talla, color, tela, codigo, estilo, notas, fuentes, fotos, fotos_prenda, coleccion_id
     ) VALUES (
-      ${c.dept}, ${status}, ${texto(c.descripcion)}, ${keyItemId}, ${texto(c.tienda, 200)},
+      ${c.dept}, ${status}, ${texto(c.descripcion)}, ${keyItemId}, ${texto(c.tienda, 200)}, ${texto(c.proveedor, 200)},
       ${texto(c.marca, 200)}, ${precio}, ${cantidadValida(c.cantidad)}, ${texto(c.talla, 100)}, ${texto(c.color, 100)},
       ${texto(c.tela, 300)}, ${texto(c.codigo, 100)}, ${texto(c.estilo, 100)},
       ${texto(c.notas, 2000)}, ${JSON.stringify(fuentes)}::jsonb, ${JSON.stringify(fotos)}::jsonb, ${JSON.stringify(fotosPrenda)}::jsonb,

@@ -29,6 +29,7 @@ export interface Muestra {
   talla: string;
   color: string;
   tela: string;
+  proveedor?: string;
   codigo: string;
   estilo: string;
   notas: string;

@@ -24,6 +24,7 @@ export default function EditarMuestra({
     descripcion: muestra.descripcion ?? "",
     key_item_id: muestra.key_item_id ? String(muestra.key_item_id) : "",
     tienda: muestra.tienda ?? "",
+    proveedor: muestra.proveedor ?? "",
     marca: muestra.marca ?? "",
     precio_usd: muestra.precio_usd === null ? "" : String(muestra.precio_usd),
     talla: muestra.talla ?? "",
@@ -87,6 +88,9 @@ export default function EditarMuestra({
         </div>
         <div className="fila">
           {campo("tienda", "Tienda")}
+          {campo("proveedor", "Proveedor")}
+        </div>
+        <div className="fila">
           {campo("marca", "Marca")}
         </div>
         <div className="fila">

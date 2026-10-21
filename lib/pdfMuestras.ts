@@ -181,6 +181,7 @@ export async function generarPdfMuestras(
       ["Depto.", m.dept],
       ["Key item", m.key_item_nombre],
       ["Tienda", m.tienda],
+      ["Proveedor", m.proveedor],
       ["Talla", m.talla],
       ["Color", m.color],
       ["Composición", m.tela],

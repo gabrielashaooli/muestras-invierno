@@ -77,6 +77,8 @@ async function crearTablas() {
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS unida_a INTEGER`;
   // Ya se leyeron los códigos (UPC / DPCI / estilo) de sus etiquetas para reconocerla en tickets.
   await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS codigos_leidos BOOLEAN NOT NULL DEFAULT false`;
+  // Proveedor: lo escribe la persona (nunca lo llena Claude).
+  await sql`ALTER TABLE samples ADD COLUMN IF NOT EXISTS proveedor TEXT NOT NULL DEFAULT ''`;
   // Las creadas desde ticket antes de este cambio tenían esa nota; se pasa a "origen".
   await sql`UPDATE samples SET origen = 'ticket', notas = '' WHERE notas = 'Creada desde ticket'`;
   // Colecciones (ej. "Invierno NY"): agrupan las muestras de un viaje o temporada.
@@ -122,6 +124,6 @@ export function normalizarMuestra(fila: Record<string, unknown>) {
 
 // Copia de los datos editables de una muestra, para guardarla en "respaldo" antes de cambiarlos.
 export function copiaDeDatos(m: Record<string, unknown>) {
-  const campos = ["dept", "descripcion", "key_item_id", "tienda", "marca", "precio_usd", "talla", "color", "tela", "codigo", "estilo", "notas"];
+  const campos = ["dept", "descripcion", "key_item_id", "tienda", "proveedor", "marca", "precio_usd", "talla", "color", "tela", "codigo", "estilo", "notas"];
   return { fecha: new Date().toISOString(), ...Object.fromEntries(campos.map((c) => [c, m[c] ?? null])) };
 }

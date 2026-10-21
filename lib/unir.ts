@@ -36,6 +36,7 @@ export async function unirMuestras(conservarId: number, otrosIds: number[]) {
       descripcion = ${primero("descripcion")},
       marca = ${primero("marca")},
       tienda = ${primero("tienda")},
+      proveedor = ${primero("proveedor")},
       talla = ${primero("talla")},
       tela = ${primero("tela")},
       codigo = ${primero("codigo")},

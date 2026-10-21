@@ -96,7 +96,7 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
   const visibles = muestras.filter(
     (m) =>
       (!filtroTienda || claveTienda(m.tienda) === filtroTienda) &&
-      (!q || textoNormal([m.descripcion, m.marca, m.color, m.codigo, m.estilo, m.tienda, m.key_item_nombre].join(" ")).includes(q)),
+      (!q || textoNormal([m.descripcion, m.marca, m.color, m.codigo, m.estilo, m.tienda, m.proveedor, m.key_item_nombre].join(" ")).includes(q)),
   );
   const secciones = [
     ...visibles

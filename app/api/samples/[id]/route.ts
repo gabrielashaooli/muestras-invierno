@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const filas = (await sql`
       UPDATE samples SET
         dept = ${e.dept}, descripcion = ${texto(e.descripcion)}, key_item_id = ${keyItemId},
-        tienda = ${texto(e.tienda, 200)}, marca = ${texto(e.marca, 200)}, precio_usd = ${precio},
+        tienda = ${texto(e.tienda, 200)}, proveedor = ${texto(e.proveedor, 200)}, marca = ${texto(e.marca, 200)}, precio_usd = ${precio},
         talla = ${texto(e.talla, 100)}, color = ${texto(e.color, 100)}, tela = ${texto(e.tela, 300)},
         codigo = ${texto(e.codigo, 100)}, estilo = ${texto(e.estilo, 100)}, notas = ${texto(e.notas, 2000)},
         respaldo = ${JSON.stringify(respaldo)}::jsonb

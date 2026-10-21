@@ -22,6 +22,7 @@ interface Campos {
   descripcion: string;
   key_item_id: string;
   tienda: string;
+  proveedor: string;
   marca: string;
   precio_usd: string;
   talla: string;
@@ -47,6 +48,7 @@ const VACIO: Campos = {
   descripcion: "",
   key_item_id: "",
   tienda: "",
+  proveedor: "",
   marca: "",
   precio_usd: "",
   talla: "",
@@ -108,6 +110,8 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
     if (esDepartamento(d)) setDept(d);
     const t = leerLocal("tienda");
     if (t) setCampos((c) => ({ ...c, tienda: t }));
+    const pv = leerLocal("proveedor");
+    if (pv) setCampos((c) => ({ ...c, proveedor: pv }));
     const tc = parsePrecio(leerLocal("tipoCambio"));
     if (tc) setTipoCambio(tc);
   }, []);
@@ -132,6 +136,7 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
       return n;
     });
     if (campo === "tienda") guardarLocal("tienda", valor);
+    if (campo === "proveedor") guardarLocal("proveedor", valor);
   }
 
   type SetFotos = React.Dispatch<React.SetStateAction<Foto[]>>;
@@ -302,7 +307,7 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
     setSugerenciaDept(null);
     setStatus("solo_foto");
     setCantidad(1);
-    setCampos((c) => ({ ...VACIO, tienda: c.tienda })); // la tienda se conserva
+    setCampos((c) => ({ ...VACIO, tienda: c.tienda, proveedor: c.proveedor })); // tienda y proveedor se conservan
   }
 
   async function guardar() {
@@ -350,7 +355,7 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
   }
 
   const ocupado = Boolean(procesando) || analizando;
-  const hayDatos = fotos.length > 0 || Object.entries(campos).some(([k, v]) => k !== "tienda" && v.trim());
+  const hayDatos = fotos.length > 0 || Object.entries(campos).some(([k, v]) => k !== "tienda" && k !== "proveedor" && v.trim());
   const precio = parsePrecio(campos.precio_usd);
   const precioInvalido = campos.precio_usd.trim() !== "" && precio === null;
 
@@ -496,6 +501,9 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
 
         <div className="fila">
           {campo("tienda", "Tienda")}
+          {campo("proveedor", "Proveedor")}
+        </div>
+        <div className="fila">
           {campo("marca", "Marca")}
         </div>
 

@@ -31,6 +31,7 @@ export async function GET(req: Request) {
     ["Prenda", (f) => f.descripcion],
     ["Key item", (f) => f.key_item_nombre],
     ["Tienda", (f) => f.tienda],
+    ["Proveedor", (f) => f.proveedor],
     ["Marca", (f) => f.marca],
     ["Precio USD", (f) => f.precio_usd],
     ["Cantidad", (f) => f.cantidad],
