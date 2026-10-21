@@ -12,7 +12,9 @@ export default function EditarMuestra({
   conSesion,
   alCerrar,
   alGuardar,
+  proveedores = [],
 }: {
+  proveedores?: string[];
   muestra: Muestra;
   keyItems: KeyItem[];
   conSesion: ConSesion;
@@ -88,7 +90,10 @@ export default function EditarMuestra({
         </div>
         <div className="fila">
           {campo("tienda", "Tienda")}
-          {campo("proveedor", "Proveedor")}
+          {campo("proveedor", "Proveedor", { list: "ed-lista-proveedores", autoComplete: "off" })}
+          <datalist id="ed-lista-proveedores">
+            {proveedores.map((p) => <option key={p} value={p} />)}
+          </datalist>
         </div>
         <div className="fila">
           {campo("marca", "Marca")}

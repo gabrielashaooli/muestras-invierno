@@ -36,7 +36,7 @@ export async function completarDesdeTicket(p: { texto: string; codigo: string; t
     p.precio !== null && `Precio pagado: $${p.precio}`,
   ].filter(Boolean).join("\n");
 
-  const { datos, fuentes } = await consultarClaude(INSTRUCCIONES_COMPLETAR, [{ type: "text", text: pista }], 4);
+  const { datos, fuentes } = await consultarClaude(INSTRUCCIONES_COMPLETAR, [{ type: "text", text: pista }], 2);
   return {
     desc: limpio(datos.desc),
     marca: limpio(datos.marca),

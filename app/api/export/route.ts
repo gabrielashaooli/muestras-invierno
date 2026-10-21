@@ -14,6 +14,7 @@ export async function GET(req: Request) {
   const origen = url.origin;
   const conPrecios = url.searchParams.get("precios") !== "0";
   const coleccion = Number(url.searchParams.get("coleccion")) || null;
+  const proveedor = (url.searchParams.get("proveedor") ?? "").trim().toLowerCase();
   const absolutas = (lista: unknown) =>
     ((lista as string[]) ?? []).map((u) => (u.startsWith("/") ? origen + u : u)).join(" ");
 
@@ -22,7 +23,9 @@ export async function GET(req: Request) {
     SELECT s.*, k.nombre AS key_item_nombre
     FROM samples s LEFT JOIN key_items k ON k.id = s.key_item_id
     WHERE s.eliminado_en IS NULL AND (${coleccion}::int IS NULL OR s.coleccion_id = ${coleccion})
-    ORDER BY s.dept, s.creado_en`) as Record<string, unknown>[]).map(normalizarMuestra);
+    ORDER BY s.dept, s.creado_en`) as Record<string, unknown>[])
+    .map(normalizarMuestra)
+    .filter((f) => !proveedor || String((f as Record<string, unknown>).proveedor ?? "").trim().toLowerCase() === proveedor);
 
   const columnas: [string, (f: Record<string, unknown>) => unknown][] = [
     ["ID", (f) => f.id],

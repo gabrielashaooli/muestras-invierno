@@ -143,7 +143,7 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
       { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
     ]),
     { type: "text", text: `${contexto}\n\nAnaliza la prenda y responde solo con el JSON.` },
-  ]);
+  ], 2, "medium");
 
   const idSugerido = Number(datos.keyItemId);
   const resultado: Analisis = {
@@ -173,13 +173,18 @@ export async function analizarImagenes(imagenes: Imagen[], dept: Departamento | 
 export async function consultarClaude(
   sistema: string,
   contenido: Anthropic.ContentBlockParam[],
-  busquedas = 4,
+  busquedas = 2,
+  // Menos esfuerzo = menos tokens de razonamiento (lo que más cuesta). Leer etiquetas/tickets no necesita más.
+  esfuerzo: "low" | "medium" = "low",
 ): Promise<{ datos: Record<string, unknown>; fuentes: Fuente[] }> {
   if (!process.env.ANTHROPIC_API_KEY) throw new ErrorAnalisis("Falta ANTHROPIC_API_KEY", 500);
   const cliente = new Anthropic();
   // Sin búsquedas (ej. leer un ticket) no se manda la herramienta.
   const herramientas: Anthropic.ToolUnion[] =
-    busquedas > 0 ? [{ type: "web_search_20250305", name: "web_search", max_uses: busquedas }] : [];
+    busquedas > 0 ? [{ type: "web_search_20260209", name: "web_search", max_uses: busquedas }] : [];
+  // Las instrucciones van en caché: las siguientes llamadas (y cada vuelta de pause_turn) las cobran a 1/10.
+  const sistemaEnCache: Anthropic.TextBlockParam[] = [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }];
+  const opciones = { output_config: { effort: esfuerzo } };
   const mensajes: Anthropic.MessageParam[] = [{ role: "user", content: contenido }];
   const fuentes = new Map<string, Fuente>();
   let respuesta: Anthropic.Message;
@@ -188,9 +193,10 @@ export async function consultarClaude(
     respuesta = await cliente.messages.create({
       model: MODELO,
       max_tokens: 16000,
-      system: sistema,
+      system: sistemaEnCache,
       tools: herramientas,
       messages: mensajes,
+      ...opciones,
     });
     extraerFuentes(respuesta.content, fuentes);
 
@@ -201,9 +207,10 @@ export async function consultarClaude(
       respuesta = await cliente.messages.create({
         model: MODELO,
         max_tokens: 16000,
-        system: sistema,
+        system: sistemaEnCache,
         tools: herramientas,
         messages: mensajes,
+        ...opciones,
       });
       extraerFuentes(respuesta.content, fuentes);
     }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, NoAutorizado } from "@/lib/api";
+import { proveedoresDe } from "@/lib/codigos";
 import { guardarLocal, leerLocal } from "@/lib/local";
 import type { Coleccion, KeyItem, Muestra } from "@/lib/tipos";
 import Acceso from "@/components/Acceso";
@@ -124,6 +125,7 @@ export default function Inicio() {
 
   const coleccion = colecciones.find((c) => c.id === activa);
   const deLaColeccion = muestras.filter((m) => m.coleccion_id === activa);
+  const proveedores = proveedoresDe(muestras);
 
   // Barra superior de cada pantalla.
   const barra = (titulo: string, atras?: { texto: string; ir: () => void }) => (
@@ -172,10 +174,10 @@ export default function Inicio() {
       )}
 
       {vista === "coleccion" && coleccion && (
-        <ListaMuestras muestras={deLaColeccion} keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />
+        <ListaMuestras muestras={deLaColeccion} keyItems={keyItems} proveedores={proveedores} conSesion={conSesion} alCambiar={recargar} />
       )}
       {vista === "agregar" && (
-        <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} />
+        <Capturar keyItems={keyItems} coleccionId={activa} conSesion={conSesion} alGuardar={recargar} proveedores={proveedores} />
       )}
       {vista === "resumen" && <Resumen muestras={deLaColeccion} keyItems={keyItems} titulo={coleccion?.nombre} coleccionId={activa} />}
       {vista === "keyitems" && <KeyItems keyItems={keyItems} conSesion={conSesion} alCambiar={recargar} />}

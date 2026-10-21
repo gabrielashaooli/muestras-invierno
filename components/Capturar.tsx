@@ -78,9 +78,10 @@ interface Props {
   coleccionId: number | null; // colección donde se guarda la muestra
   conSesion: ConSesion;
   alGuardar: () => Promise<void>;
+  proveedores?: string[]; // ya usados, para sugerirlos
 }
 
-export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }: Props) {
+export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar, proveedores = [] }: Props) {
   const [dept, setDept] = useState<Departamento>("Mujer");
   const [status, setStatus] = useState<Estatus>("solo_foto");
   const [cantidad, setCantidad] = useState(1);
@@ -501,7 +502,10 @@ export default function Capturar({ keyItems, coleccionId, conSesion, alGuardar }
 
         <div className="fila">
           {campo("tienda", "Tienda")}
-          {campo("proveedor", "Proveedor")}
+          {campo("proveedor", "Proveedor", { list: "lista-proveedores", autoComplete: "off" })}
+          <datalist id="lista-proveedores">
+            {proveedores.map((p) => <option key={p} value={p} />)}
+          </datalist>
         </div>
         <div className="fila">
           {campo("marca", "Marca")}

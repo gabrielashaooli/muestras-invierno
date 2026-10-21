@@ -372,6 +372,7 @@ a {
 /* ───────── Buscar ───────── */
 .buscar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -387,12 +388,13 @@ a {
 }
 
 .buscar input {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
 }
 
 .buscar select {
-  max-width: 45%;
+  flex: 1 1 0;
+  min-width: 0;
   -webkit-appearance: none;
   appearance: none;
 }
@@ -1353,4 +1355,15 @@ details summary {
 .ticket-guardado {
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.selector {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  background: var(--gris);
+  font-size: 16px;
+  color: var(--texto);
 }

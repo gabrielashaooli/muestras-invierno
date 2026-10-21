@@ -95,7 +95,7 @@ export async function buscarFotoEnInternet(p: {
     p.tienda && `Tienda donde se vio: ${p.tienda}`,
   ].filter(Boolean).join("\n");
 
-  const { datos } = await consultarClaude(INSTRUCCIONES_FOTO, [{ type: "text", text: `${pista}\n\nBusca la página del producto.` }], 3);
+  const { datos } = await consultarClaude(INSTRUCCIONES_FOTO, [{ type: "text", text: `${pista}\n\nBusca la página del producto.` }], 2);
   const paginas = (Array.isArray(datos.paginas) ? datos.paginas : []).map(urlSegura).filter(Boolean).slice(0, 3) as string[];
   const directas = (Array.isArray(datos.imagenes) ? datos.imagenes : []).map(urlSegura).filter(Boolean).slice(0, 3) as string[];
 

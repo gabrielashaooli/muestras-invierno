@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { proveedoresDe, textoNormal } from "@/lib/codigos";
 import { guardarLocal, leerLocal, TIPO_CAMBIO_INICIAL } from "@/lib/local";
 import { parsePrecio } from "@/lib/precio";
 import { compartirArchivo, generarPdfMuestras } from "@/lib/pdfMuestras";
@@ -28,21 +29,28 @@ export default function Resumen({
   const [soloCompradas, setSoloCompradas] = useState(false);
   const [conPrecios, setConPrecios] = useState(true);
   const [deptPdf, setDeptPdf] = useState<Departamento | "">("");
+  const [proveedorPdf, setProveedorPdf] = useState("");
+  const proveedores = proveedoresDe(muestras);
   const [avance, setAvance] = useState<string>("");
   const [errorPdf, setErrorPdf] = useState("");
 
   const paraPdf = muestras
-    .filter((m) => (!soloCompradas || m.status === "comprado") && (!deptPdf || m.dept === deptPdf))
+    .filter(
+      (m) =>
+        (!soloCompradas || m.status === "comprado") &&
+        (!deptPdf || m.dept === deptPdf) &&
+        (!proveedorPdf || textoNormal(m.proveedor ?? "") === textoNormal(proveedorPdf)),
+    )
     .sort((a, b) => a.dept.localeCompare(b.dept) || a.creado_en.localeCompare(b.creado_en));
 
   async function descargarPdf() {
     setErrorPdf("");
     setAvance("Preparando…");
     try {
-      const titulo = [`Muestras ${nombreColeccion ?? ""}`.trim(), deptPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
+      const titulo = [`Muestras ${nombreColeccion ?? ""}`.trim(), deptPdf, proveedorPdf, soloCompradas ? "compradas" : ""].filter(Boolean).join(" · ");
       const blob = await generarPdfMuestras(paraPdf, titulo, (hechas, total) => setAvance(`Preparando ${hechas} de ${total}…`), conPrecios);
       const fecha = new Date().toISOString().slice(0, 10);
-      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${soloCompradas ? "-compradas" : ""}${conPrecios ? "" : "-sin-precios-sin-etiqueta"}-${fecha}.pdf`.toLowerCase());
+      await compartirArchivo(blob, `muestras-${(nombreColeccion ?? "").replace(/\s+/g, "-")}-${deptPdf || "todas"}${proveedorPdf ? `-${proveedorPdf.replace(/\s+/g, "-")}` : ""}${soloCompradas ? "-compradas" : ""}${conPrecios ? "" : "-sin-precios-sin-etiqueta"}-${fecha}.pdf`.toLowerCase());
     } catch (e) {
       setErrorPdf(`No se pudo crear el PDF: ${(e as Error).message}`);
     } finally {
@@ -163,6 +171,14 @@ export default function Resumen({
             <button key={d} aria-pressed={deptPdf === d} onClick={() => setDeptPdf(d)}>{d}</button>
           ))}
         </div>
+        {proveedores.length > 0 && (
+          <select className="selector" value={proveedorPdf} onChange={(e) => setProveedorPdf(e.target.value)} aria-label="Proveedor">
+            <option value="">Todos los proveedores</option>
+            {proveedores.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        )}
         <div className="segmentos" role="group" aria-label="Qué muestras incluir">
           <button aria-pressed={!soloCompradas} onClick={() => setSoloCompradas(false)}>Todas</button>
           <button aria-pressed={soloCompradas} onClick={() => setSoloCompradas(true)}>Solo compradas</button>
@@ -181,7 +197,7 @@ export default function Resumen({
         {errorPdf && <div className="estado error">{errorPdf}</div>}
       </section>
 
-      <a className="boton ancho" href={`/api/export?precios=${conPrecios ? 1 : 0}${coleccionId ? `&coleccion=${coleccionId}` : ""}`} download>
+      <a className="boton ancho" href={`/api/export?precios=${conPrecios ? 1 : 0}${coleccionId ? `&coleccion=${coleccionId}` : ""}${proveedorPdf ? `&proveedor=${encodeURIComponent(proveedorPdf)}` : ""}`} download>
         <IconoDescarga /> Descargar tabla para Excel ({conPrecios ? "con precios" : "sin precios ni etiqueta"})
       </a>
     </>

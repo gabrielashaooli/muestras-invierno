@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { textoNormal } from "@/lib/codigos";
+import { proveedoresDe, textoNormal } from "@/lib/codigos";
 import { gruposDuplicados } from "@/lib/duplicados";
 import { comprimirImagen } from "@/lib/imagen";
 import type { KeyItem, Muestra } from "@/lib/tipos";
@@ -16,13 +16,15 @@ interface Props {
   keyItems: KeyItem[];
   conSesion: ConSesion;
   alCambiar: () => Promise<void>;
+  proveedores?: string[]; // todos los ya usados (para sugerir al editar)
 }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar }: Props) {
+export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar, proveedores = [] }: Props) {
   const [busqueda, setBusqueda] = useState("");
   const [filtroTienda, setFiltroTienda] = useState("");
+  const [filtroProveedor, setFiltroProveedor] = useState("");
   const [detalleId, setDetalleId] = useState<number | null>(null);
   const [editando, setEditando] = useState<Muestra | null>(null);
   const [visor, setVisor] = useState<EstadoVisor | null>(null);
@@ -92,10 +94,12 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
   const claveTienda = (t: string) => (t ?? "").trim().toLowerCase();
   const tiendas = [...new Map(muestras.filter((m) => m.tienda?.trim()).map((m) => [claveTienda(m.tienda), m.tienda.trim()])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]));
+  const deLaLista = proveedoresDe(muestras);
   const q = textoNormal(busqueda);
   const visibles = muestras.filter(
     (m) =>
       (!filtroTienda || claveTienda(m.tienda) === filtroTienda) &&
+      (!filtroProveedor || textoNormal(m.proveedor ?? "") === filtroProveedor) &&
       (!q || textoNormal([m.descripcion, m.marca, m.color, m.codigo, m.estilo, m.tienda, m.proveedor, m.key_item_nombre].join(" ")).includes(q)),
   );
   const secciones = [
@@ -126,6 +130,14 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
             ))}
           </select>
         )}
+        {deLaLista.length > 0 && (
+          <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} aria-label="Proveedor">
+            <option value="">Todos los proveedores</option>
+            {deLaLista.map((p) => (
+              <option key={p} value={textoNormal(p)}>{p}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {repetidas.length > 0 && (
@@ -142,7 +154,7 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
       {error && <div className="aviso error" onClick={() => setError("")}>{error}</div>}
 
       {visibles.length === 0 && (
-        <p className="vacio">{busqueda || filtroTienda ? "Sin resultados." : "Aún no hay muestras. Toca “+ Agregar muestra”."}</p>
+        <p className="vacio">{busqueda || filtroTienda || filtroProveedor ? "Sin resultados." : "Aún no hay muestras. Toca “+ Agregar muestra”."}</p>
       )}
 
       {secciones.map((s) => (
@@ -202,6 +214,7 @@ export default function ListaMuestras({ muestras, keyItems, conSesion, alCambiar
         <EditarMuestra
           muestra={editando}
           keyItems={keyItems}
+          proveedores={proveedores}
           conSesion={conSesion}
           alCerrar={() => setEditando(null)}
           alGuardar={alCambiar}

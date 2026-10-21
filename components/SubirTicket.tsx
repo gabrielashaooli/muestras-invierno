@@ -219,7 +219,12 @@ export default function SubirTicket({
         const a = acciones[i];
         if (a.startsWith("m")) textoDe.set(Number(a.slice(1)), x.descripcion);
       });
-      const porCompletar = [...r.creadas, ...r.actualizadas];
+      // Para ahorrar créditos solo se completan las nuevas y las que ya estaban pero sin descripción o sin fotos.
+      const leFalta = (id: number) => {
+        const m = muestras.find((x) => x.id === id);
+        return !m || !m.descripcion?.trim() || m.fotos.length + (m.fotos_prenda?.length ?? 0) === 0;
+      };
+      const porCompletar = [...r.creadas, ...r.actualizadas.filter(leFalta)];
       let conFoto = 0;
       for (let i = 0; i < porCompletar.length; i++) {
         setAvance(`Actualizando descripciones ${i + 1} de ${porCompletar.length}…`);

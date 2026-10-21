@@ -32,3 +32,13 @@ export function unirColores(...listas: string[]): string {
     ).values(),
   ].join(", ");
 }
+
+// Nombres de proveedor ya usados, sin repetir (para sugerirlos al escribir).
+export function proveedoresDe(muestras: { proveedor?: string }[]): string[] {
+  const unicos = new Map<string, string>();
+  for (const m of muestras) {
+    const p = (m.proveedor ?? "").trim();
+    if (p && !unicos.has(textoNormal(p))) unicos.set(textoNormal(p), p);
+  }
+  return [...unicos.values()].sort((a, b) => a.localeCompare(b));
+}
